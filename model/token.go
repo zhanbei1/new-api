@@ -85,6 +85,16 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	return tokens, err
 }
 
+// GetOldestUserToken returns the earliest created token for a user (by id ascending).
+func GetOldestUserToken(userId int) (*Token, error) {
+	var token Token
+	err := DB.Where("user_id = ?", userId).Order("id asc").First(&token).Error
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
 // sanitizeLikePattern 校验并清洗用户输入的 LIKE 搜索模式。
 // 规则：
 //  1. 转义 ! 和 _（使用 ! 作为 ESCAPE 字符，兼容 MySQL/PostgreSQL/SQLite）

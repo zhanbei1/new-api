@@ -109,6 +109,11 @@ export function useSidebarData(): SidebarData {
             icon: Wallet,
           },
           {
+            title: t('Tickets'),
+            url: '/tickets',
+            icon: MessageSquare,
+          },
+          {
             title: t('Profile'),
             url: '/profile',
             icon: User,
@@ -143,6 +148,11 @@ export function useSidebarData(): SidebarData {
             title: t('Subscriptions'),
             url: '/subscriptions',
             icon: CreditCard,
+          },
+          {
+            title: t('Ticket Management'),
+            url: '/ticket-admin',
+            icon: ListTodo,
           },
           {
             title: t('System Info'),

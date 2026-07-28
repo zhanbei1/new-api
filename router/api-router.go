@@ -238,6 +238,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			tokenRoute.GET("/", controller.GetAllTokens)
 			tokenRoute.GET("/search", middleware.SearchRateLimit(), controller.SearchTokens)
+			tokenRoute.GET("/default", middleware.DisableCache(), controller.GetDefaultToken)
 			tokenRoute.GET("/:id", controller.GetToken)
 			tokenRoute.POST("/:id/key", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetTokenKey)
 			tokenRoute.POST("/", controller.AddToken)
@@ -245,6 +246,27 @@ func SetApiRouter(router *gin.Engine) {
 			tokenRoute.DELETE("/:id", controller.DeleteToken)
 			tokenRoute.POST("/batch", controller.DeleteTokenBatch)
 			tokenRoute.POST("/batch/keys", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetTokenKeysBatch)
+		}
+
+		ticketRoute := apiRouter.Group("/ticket")
+		ticketRoute.Use(middleware.UserAuth())
+		{
+			ticketRoute.POST("/", controller.CreateTicket)
+			ticketRoute.GET("/self", controller.GetUserTickets)
+			ticketRoute.GET("/self/:id", controller.GetUserTicket)
+			ticketRoute.POST("/self/:id/replies", controller.CreateUserTicketReply)
+			ticketRoute.PUT("/self/:id/close", controller.CloseUserTicket)
+			ticketRoute.DELETE("/self/:id", controller.DeleteUserTicket)
+		}
+		ticketAdminRoute := apiRouter.Group("/ticket")
+		ticketAdminRoute.Use(middleware.AdminAuth())
+		{
+			ticketAdminRoute.GET("/", controller.GetAllTickets)
+			ticketAdminRoute.GET("/:id", controller.GetAdminTicket)
+			ticketAdminRoute.POST("/:id/replies", controller.CreateAdminTicketReply)
+			ticketAdminRoute.PUT("/:id/close", controller.CloseAdminTicket)
+			ticketAdminRoute.PUT("/:id", controller.UpdateAdminTicket)
+			ticketAdminRoute.DELETE("/:id", controller.DeleteAdminTicket)
 		}
 
 		usageRoute := apiRouter.Group("/usage")

@@ -94,6 +94,20 @@ func GetTokenKey(c *gin.Context) {
 	})
 }
 
+func GetDefaultToken(c *gin.Context) {
+	userId := c.GetInt("id")
+	token, err := model.GetOldestUserToken(userId)
+	if err != nil {
+		common.ApiErrorMsg(c, "no default API key found; enable GENERATE_DEFAULT_TOKEN or create a token first")
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"id":   token.Id,
+		"name": token.Name,
+		"key":  token.GetFullKey(),
+	})
+}
+
 func GetTokenStatus(c *gin.Context) {
 	tokenId := c.GetInt("token_id")
 	userId := c.GetInt("id")
