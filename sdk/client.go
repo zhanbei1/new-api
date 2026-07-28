@@ -93,19 +93,32 @@ func (c *Client) doJSON(ctx context.Context, method, path string, query url.Valu
 	if err := json.Unmarshal(raw, &env); err != nil {
 		return err
 	}
-	// usage endpoint uses code:true; others use success:true
-	ok := env.Success || env.Code
+	// success:true (standard), code:true (usage), message:"success" (payment gateways)
+	ok := env.Success || env.Code || env.Message == "success"
 	if !ok {
-		msg := env.Message
-		if msg == "" {
-			msg = "request failed"
-		}
+		msg := paymentErrorMessage(env)
 		return &APIError{StatusCode: resp.StatusCode, Message: msg}
 	}
 	if out == nil || len(env.Data) == 0 || string(env.Data) == "null" {
 		return nil
 	}
 	return json.Unmarshal(env.Data, out)
+}
+
+func paymentErrorMessage(env apiEnvelope) string {
+	if env.Message == "error" && len(env.Data) > 0 {
+		var s string
+		if err := json.Unmarshal(env.Data, &s); err == nil && s != "" {
+			return s
+		}
+	}
+	if env.Message != "" && env.Message != "error" {
+		return env.Message
+	}
+	if env.Message == "error" {
+		return "payment request failed"
+	}
+	return "request failed"
 }
 
 func (c *Client) doAuthed(ctx context.Context, method, path string, query url.Values, body, out any) error {
@@ -117,4 +130,44 @@ func (c *Client) doAuthed(ctx context.Context, method, path string, query url.Va
 
 func (c *Client) doPublic(ctx context.Context, method, path string, query url.Values, body, out any) error {
 	return c.doJSON(ctx, method, path, query, body, "", out)
+}
+
+// doAuthedRaw returns the raw JSON body after auth (for responses with extra top-level fields).
+func (c *Client) doAuthedRaw(ctx context.Context, method, path string, query url.Values, body any) ([]byte, error) {
+	if c.AccessToken == "" {
+		return nil, &APIError{Message: "access token is required; call Login first"}
+	}
+	var reader io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		reader = bytes.NewReader(b)
+	}
+	full := c.BaseURL + path
+	if len(query) > 0 {
+		full += "?" + query.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, method, full, reader)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Authorization", "Bearer "+c.AccessToken)
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &APIError{StatusCode: resp.StatusCode, Message: strings.TrimSpace(string(raw))}
+	}
+	return raw, nil
 }
