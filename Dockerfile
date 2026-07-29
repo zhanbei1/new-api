@@ -1,41 +1,76 @@
-FROM oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2e4e42a7 AS builder
+# ------------------------------
+# Builder: Bun + WebUI
+# ------------------------------
+    FROM docker.1ms.run/oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2e4e42a7 AS builder
 
-WORKDIR /build/web
-COPY web/package.json web/bun.lock ./
-RUN bun install --frozen-lockfile
-COPY ./web ./
-COPY ./VERSION /build/VERSION
-RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
-
-FROM golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039 AS builder2
-ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
-
-ARG TARGETOS
-ARG TARGETARCH
-ENV GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64}
-ENV GOEXPERIMENT=greenteagc
-
-WORKDIR /build
-
-ADD go.mod go.sum ./
-# relaykit is a local submodule referenced via replace; its go.mod must be
-# present for go mod download to resolve the main module graph.
-ADD relaykit/go.mod ./relaykit/go.mod
-RUN go mod download
-
-COPY . .
-COPY --from=builder /build/web/dist ./web/dist
-RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
-
-FROM debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && update-ca-certificates
-
-COPY --from=builder2 /build/new-api /
-COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
-EXPOSE 3000
-WORKDIR /data
-ENTRYPOINT ["/new-api"]
+    WORKDIR /build/web
+    
+    # Bun 国内镜像
+    ENV BUN_INSTALL_MIRROR=https://registry.npmmirror.com/bun
+    ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+    
+    COPY web/package.json web/bun.lock ./
+    RUN bun install --frozen-lockfile
+    
+    COPY ./web ./
+    COPY ./VERSION /build/VERSION
+    
+    RUN DISABLE_ESLINT_PLUGIN='true' \
+        VITE_REACT_APP_VERSION=$(cat /build/VERSION) \
+        bun run build
+    
+    # ------------------------------
+    # Builder2: Go 编译
+    # ------------------------------
+    FROM docker.1ms.run/golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039 AS builder2
+    
+    # Go 国内代理
+    ENV GOPROXY=https://goproxy.cn,direct
+    ENV GO111MODULE=on
+    ENV CGO_ENABLED=0
+    ENV GOWORK=off
+    ENV GOEXPERIMENT=greenteagc
+    
+    ARG TARGETOS
+    ARG TARGETARCH
+    ENV GOOS=${TARGETOS:-linux}
+    ENV GOARCH=${TARGETARCH:-amd64}
+    
+    # Alpine 国内源
+    RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+        apk add --no-cache git
+    
+    WORKDIR /build
+    
+    ADD go.mod go.sum ./
+    ADD relaykit/go.mod ./relaykit/go.mod
+    RUN go mod download
+    
+    COPY . .
+    COPY --from=builder /build/web/dist ./web/dist
+    
+    RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
+    
+    # ------------------------------
+    # Final: Debian 运行时
+    # ------------------------------
+    FROM docker.1ms.run/debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
+    
+    # Debian 国内源
+    RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+        sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
+    
+    RUN apt-get update \
+        && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
+        && rm -rf /var/lib/apt/lists/* \
+        && update-ca-certificates
+    
+    # 时区
+    ENV TZ=Asia/Shanghai
+    
+    COPY --from=builder2 /build/new-api /
+    COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
+    
+    EXPOSE 3000
+    WORKDIR /data
+    ENTRYPOINT ["/new-api"]
