@@ -74,6 +74,7 @@ func main() {
 | Method | Endpoint |
 |--------|----------|
 | `Register` / `Login` | `/api/user/register`, `/api/user/login` |
+| `SendEmailVerification` / `BindEmail` | `/api/verification`, `/api/oauth/email/bind` |
 | `DeleteSelf` | `/api/user/self` |
 | `GetSelf` / `UpdateSelf` | `/api/user/self` |
 | `GetAffCode` | `/api/user/aff` |
@@ -86,8 +87,37 @@ func main() {
 | `CreateOAuthState` | `/api/oauth/state` |
 | `GetAPIKey` | `/api/token/default` |
 | `GetTokenUsage` | `/api/usage/token/` |
+| `GetUserModels` | `/api/user/models` |
+| `ListActiveSubscriptionModels` / `GetActiveSubscriptionModels` | `/api/subscription/self` + `/api/user/models` |
 | Subscription helpers | `/api/subscription/*` |
 | Ticket helpers | `/api/ticket/self*` |
+
+### Subscription → group → models (after purchase)
+
+Models are not stored on the plan itself. After purchase, each active subscription
+has an `upgrade_group`; models come from that group via `/api/user/models`.
+
+```go
+// Per active subscription (subscription_id, plan_id, upgrade_group, models)
+items, err := c.ListActiveSubscriptionModels(ctx)
+if err != nil {
+	log.Fatal(err)
+}
+for _, item := range items {
+	fmt.Println(item.UpgradeGroup, item.Models)
+}
+
+// Or a deduplicated model list across all active upgrade groups
+models, err := c.GetActiveSubscriptionModels(ctx)
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Println(models)
+
+// Or query one group directly (empty if the user cannot use that group yet)
+vipModels, _ := c.GetUserModels(ctx, "vip")
+_ = vipModels
+```
 
 ### Scan-to-pay (Alipay / WeChat via epay)
 
@@ -127,3 +157,4 @@ This SDK does **not** wrap `/v1` chat completions. Use your preferred OpenAI-com
 - `GetAPIKey` errors if the user has no token yet.
 - Management calls use JWT (`Authorization: Bearer <access_token>`). Usage calls use the API key.
 - Online top-up requires payment compliance confirmed and epay configured on the server.
+- `SendEmailVerification` needs a Turnstile token query param when the server enables `turnstile_check`; pass it as the second argument.

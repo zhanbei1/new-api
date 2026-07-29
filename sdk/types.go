@@ -34,11 +34,25 @@ type User struct {
 }
 
 // LoginResult is returned by password or WeChat login.
+//
+// Newer New API builds return access_token + nested user.
+// Legacy session builds (e.g. v1.0.0-rc.10) return flat user fields and set a
+// session cookie instead — the SDK upgrades that to a PAT via GET /api/user/token.
 type LoginResult struct {
 	AccessToken     string `json:"access_token"`
 	TokenType       string `json:"token_type"`
 	AccessExpiresAt int64  `json:"access_expires_at"`
 	User            User   `json:"user"`
+	Require2FA      bool   `json:"require_2fa,omitempty"`
+	FlowToken       string `json:"flow_token,omitempty"`
+
+	// Legacy flat user fields (pre JWT-session login response).
+	ID          int    `json:"id,omitempty"`
+	Username    string `json:"username,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	Role        int    `json:"role,omitempty"`
+	Status      int    `json:"status,omitempty"`
+	Group       string `json:"group,omitempty"`
 }
 
 // DefaultToken is returned by GetAPIKey.
@@ -77,15 +91,16 @@ type TopUp struct {
 
 // AuthProviders summarizes which login integrations are enabled.
 type AuthProviders struct {
-	WeChatEnabled   bool
-	GitHubEnabled   bool
-	DiscordEnabled  bool
-	OIDCEnabled     bool
-	TelegramEnabled bool
-	LinuxDoEnabled  bool
-	PasskeyEnabled  bool
-	RegisterEnabled bool
-	CustomProviders []CustomOAuthProvider
+	WeChatEnabled            bool
+	GitHubEnabled            bool
+	DiscordEnabled           bool
+	OIDCEnabled              bool
+	TelegramEnabled          bool
+	LinuxDoEnabled           bool
+	PasskeyEnabled           bool
+	RegisterEnabled          bool
+	EmailVerificationEnabled bool
+	CustomProviders          []CustomOAuthProvider
 }
 
 // CustomOAuthProvider is a custom OAuth app from /api/status.
@@ -139,3 +154,12 @@ type SubscriptionSelf map[string]any
 
 // SubscriptionPlanItem is one entry from GET /api/subscription/plans.
 type SubscriptionPlanItem map[string]any
+
+// SubscriptionGroupModels is one active subscription paired with models
+// available under its upgrade_group for the current user.
+type SubscriptionGroupModels struct {
+	SubscriptionID int      `json:"subscription_id"`
+	PlanID         int      `json:"plan_id"`
+	UpgradeGroup   string   `json:"upgrade_group"`
+	Models         []string `json:"models"`
+}

@@ -1,6 +1,9 @@
 package sdk
 
-import "context"
+import (
+	"context"
+	"net/url"
+)
 
 // GetSelf returns the current user profile.
 func (c *Client) GetSelf(ctx context.Context) (*User, error) {
@@ -9,6 +12,25 @@ func (c *Client) GetSelf(ctx context.Context) (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// GetUserModels returns enabled models for groups the current user can use.
+// Pass a non-empty group to filter to that group; if the user cannot use it
+// (e.g. subscription not purchased yet), the result is empty.
+// Pass "" to return models across all usable groups.
+func (c *Client) GetUserModels(ctx context.Context, group string) ([]string, error) {
+	var q url.Values
+	if group != "" {
+		q = url.Values{"group": {group}}
+	}
+	var models []string
+	if err := c.doAuthed(ctx, "GET", "/api/user/models", q, nil, &models); err != nil {
+		return nil, err
+	}
+	if models == nil {
+		return []string{}, nil
+	}
+	return models, nil
 }
 
 // UpdateSelfRequest updates profile fields.

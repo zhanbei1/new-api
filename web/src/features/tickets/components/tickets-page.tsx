@@ -200,14 +200,14 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteTicket(mode, id),
-    onSuccess: (res) => {
+    onSuccess: (res, id) => {
       if (!res.success) {
         toast.error(res.message || t('Failed to delete ticket'))
         return
       }
       toast.success(t('Ticket deleted'))
       setDeleteId(null)
-      if (selectedId === deleteId) setSelectedId(null)
+      setSelectedId((current) => (current === id ? null : current))
       invalidate()
     },
     onError: (err: Error) => toast.error(err.message),
@@ -222,6 +222,7 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
     : null
 
   return (
+    <>
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Title>
         {mode === 'admin' ? t('Ticket Management') : t('Tickets')}
@@ -269,7 +270,8 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
           ) : null}
         </div>
 
-        <div className='overflow-hidden rounded-lg border'>
+        <div className='flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border'>
+          <div className='min-h-0 flex-1 overflow-auto'>
           <table className='w-full text-sm'>
             <thead className='bg-muted/50 text-left'>
               <tr>
@@ -356,9 +358,9 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
               })()}
             </tbody>
           </table>
-        </div>
+          </div>
 
-        <div className='mt-4 flex items-center justify-end gap-2'>
+        <div className='flex items-center justify-end gap-2 border-t px-3 py-2'>
           <Button
             size='sm'
             variant='outline'
@@ -379,7 +381,9 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
             {t('Next')}
           </Button>
         </div>
+        </div>
       </SectionPageLayout.Content>
+    </SectionPageLayout>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
@@ -572,6 +576,6 @@ export function TicketsPage({ mode }: { mode: TicketMode }) {
         }}
         isLoading={deleteMutation.isPending}
       />
-    </SectionPageLayout>
+    </>
   )
 }
