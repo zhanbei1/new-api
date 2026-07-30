@@ -89,8 +89,30 @@ func main() {
 | `GetTokenUsage` | `/api/usage/token/` |
 | `GetUserModels` | `/api/user/models` |
 | `ListActiveSubscriptionModels` / `GetActiveSubscriptionModels` | `/api/subscription/self` + `/api/user/models` |
+| `GetCheckinStatus` / `DoCheckin` | `/api/user/checkin` |
 | Subscription helpers | `/api/subscription/*` |
 | Ticket helpers | `/api/ticket/self*` |
+
+### Check-in (签到)
+
+Requires the server check-in feature enabled. `DoCheckin` needs a Turnstile token
+query param when `turnstile_check` is on.
+
+```go
+status, err := c.GetCheckinStatus(ctx, "") // current month
+if err != nil {
+	log.Fatal(err)
+}
+if status.Stats.CheckedInToday {
+	fmt.Println("already checked in")
+} else {
+	res, err := c.DoCheckin(ctx, "") // or pass turnstile token
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("awarded:", res.QuotaAwarded, "date:", res.CheckinDate)
+}
+```
 
 ### Subscription → group → models (after purchase)
 
@@ -157,4 +179,4 @@ This SDK does **not** wrap `/v1` chat completions. Use your preferred OpenAI-com
 - `GetAPIKey` errors if the user has no token yet.
 - Management calls use JWT (`Authorization: Bearer <access_token>`). Usage calls use the API key.
 - Online top-up requires payment compliance confirmed and epay configured on the server.
-- `SendEmailVerification` needs a Turnstile token query param when the server enables `turnstile_check`; pass it as the second argument.
+- `SendEmailVerification` / `DoCheckin` need a Turnstile token query param when the server enables `turnstile_check`; pass it as the respective argument.

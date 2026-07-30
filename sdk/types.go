@@ -163,3 +163,32 @@ type SubscriptionGroupModels struct {
 	UpgradeGroup   string   `json:"upgrade_group"`
 	Models         []string `json:"models"`
 }
+
+// CheckinRecord is one day's check-in entry.
+type CheckinRecord struct {
+	CheckinDate  string `json:"checkin_date"`
+	QuotaAwarded int    `json:"quota_awarded"`
+}
+
+// CheckinStats is check-in statistics for the queried month plus lifetime totals.
+type CheckinStats struct {
+	CheckedInToday bool            `json:"checked_in_today"`
+	TotalCheckins  int64           `json:"total_checkins"`
+	TotalQuota     int64           `json:"total_quota"`
+	CheckinCount   int             `json:"checkin_count"`
+	Records        []CheckinRecord `json:"records"`
+}
+
+// CheckinStatus is GET /api/user/checkin data.
+type CheckinStatus struct {
+	Enabled  bool         `json:"enabled"`
+	MinQuota int          `json:"min_quota"`
+	MaxQuota int          `json:"max_quota"`
+	Stats    CheckinStats `json:"stats"`
+}
+
+// CheckinResult is POST /api/user/checkin data.
+type CheckinResult struct {
+	QuotaAwarded int    `json:"quota_awarded"`
+	CheckinDate  string `json:"checkin_date"`
+}
