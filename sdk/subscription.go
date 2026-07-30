@@ -1,9 +1,6 @@
 package sdk
 
-import (
-	"context"
-	"strings"
-)
+import "context"
 
 // ListSubscriptionPlans returns available subscription plans.
 func (c *Client) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlanItem, error) {
@@ -30,51 +27,24 @@ func (c *Client) UpdateSubscriptionPreference(ctx context.Context, preference st
 	}, nil)
 }
 
-// ListActiveSubscriptionModels maps each active subscription's upgrade_group
-// to the models currently available to the user for that group.
-// Subscriptions without upgrade_group are skipped. Groups the user cannot use
-// yet return an empty Models slice (server-side filter).
+// ListActiveSubscriptionModels returns models for each active subscription's
+// upgrade_group (channels enabled for that group).
+// Endpoint: GET /api/subscription/self/models
+// This is NOT the same as GetUserModels, which unions UserUsableGroups.
 func (c *Client) ListActiveSubscriptionModels(ctx context.Context) ([]SubscriptionGroupModels, error) {
-	var data struct {
-		Subscriptions []struct {
-			Subscription *struct {
-				ID           int    `json:"id"`
-				PlanID       int    `json:"plan_id"`
-				UpgradeGroup string `json:"upgrade_group"`
-			} `json:"subscription"`
-		} `json:"subscriptions"`
-	}
-	if err := c.doAuthed(ctx, "GET", "/api/subscription/self", nil, nil, &data); err != nil {
+	var items []SubscriptionGroupModels
+	if err := c.doAuthed(ctx, "GET", "/api/subscription/self/models", nil, nil, &items); err != nil {
 		return nil, err
 	}
-
-	byGroup := make(map[string][]string)
-	out := make([]SubscriptionGroupModels, 0)
-	for _, item := range data.Subscriptions {
-		if item.Subscription == nil {
-			continue
-		}
-		group := strings.TrimSpace(item.Subscription.UpgradeGroup)
-		if group == "" {
-			continue
-		}
-		models, ok := byGroup[group]
-		if !ok {
-			var err error
-			models, err = c.GetUserModels(ctx, group)
-			if err != nil {
-				return nil, err
-			}
-			byGroup[group] = models
-		}
-		out = append(out, SubscriptionGroupModels{
-			SubscriptionID: item.Subscription.ID,
-			PlanID:         item.Subscription.PlanID,
-			UpgradeGroup:   group,
-			Models:         models,
-		})
+	if items == nil {
+		return []SubscriptionGroupModels{}, nil
 	}
-	return out, nil
+	for i := range items {
+		if items[i].Models == nil {
+			items[i].Models = []string{}
+		}
+	}
+	return items, nil
 }
 
 // GetActiveSubscriptionModels returns a deduplicated list of models unlocked by

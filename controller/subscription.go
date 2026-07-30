@@ -74,6 +74,45 @@ func GetSubscriptionSelf(c *gin.Context) {
 	})
 }
 
+// GetSubscriptionSelfModels returns models enabled for each active subscription's
+// upgrade_group (Ability channels for that group). Unlike GET /api/user/models,
+// this does not union the global UserUsableGroups list.
+func GetSubscriptionSelfModels(c *gin.Context) {
+	userId := c.GetInt("id")
+	activeSubscriptions, err := model.GetAllActiveUserSubscriptions(userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	byGroup := make(map[string][]string)
+	items := make([]gin.H, 0)
+	for _, summary := range activeSubscriptions {
+		if summary.Subscription == nil {
+			continue
+		}
+		group := strings.TrimSpace(summary.Subscription.UpgradeGroup)
+		if group == "" {
+			continue
+		}
+		models, ok := byGroup[group]
+		if !ok {
+			models = model.GetGroupEnabledModels(group)
+			if models == nil {
+				models = []string{}
+			}
+			byGroup[group] = models
+		}
+		items = append(items, gin.H{
+			"subscription_id": summary.Subscription.Id,
+			"plan_id":         summary.Subscription.PlanId,
+			"upgrade_group":   group,
+			"models":          models,
+		})
+	}
+	common.ApiSuccess(c, items)
+}
+
 func UpdateSubscriptionPreference(c *gin.Context) {
 	userId := c.GetInt("id")
 	var req BillingPreferenceRequest

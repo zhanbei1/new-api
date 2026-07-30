@@ -87,8 +87,8 @@ func main() {
 | `CreateOAuthState` | `/api/oauth/state` |
 | `GetAPIKey` | `/api/token/default` |
 | `GetTokenUsage` | `/api/usage/token/` |
-| `GetUserModels` | `/api/user/models` |
-| `ListActiveSubscriptionModels` / `GetActiveSubscriptionModels` | `/api/subscription/self` + `/api/user/models` |
+| `GetUserModels` | `/api/user/models` (UserUsableGroups; often broader than a plan) |
+| `ListActiveSubscriptionModels` / `GetActiveSubscriptionModels` | `/api/subscription/self/models` |
 | `GetCheckinStatus` / `DoCheckin` | `/api/user/checkin` |
 | Subscription helpers | `/api/subscription/*` |
 | Ticket helpers | `/api/ticket/self*` |
@@ -116,8 +116,9 @@ if status.Stats.CheckedInToday {
 
 ### Subscription → group → models (after purchase)
 
-Models are not stored on the plan itself. After purchase, each active subscription
-has an `upgrade_group`; models come from that group via `/api/user/models`.
+Models are not stored on the plan itself. Each active subscription has an
+`upgrade_group`; the server returns models enabled on channels for that group
+(`abilities`), not the full UserUsableGroups union from `/api/user/models`.
 
 ```go
 // Per active subscription (subscription_id, plan_id, upgrade_group, models)
@@ -129,18 +130,16 @@ for _, item := range items {
 	fmt.Println(item.UpgradeGroup, item.Models)
 }
 
-// Or a deduplicated model list across all active upgrade groups
+// Deduplicated model list across all active upgrade groups
 models, err := c.GetActiveSubscriptionModels(ctx)
 if err != nil {
 	log.Fatal(err)
 }
 fmt.Println(models)
-
-// Or query one group directly (empty if the user cannot use that group yet)
-vipModels, _ := c.GetUserModels(ctx, "vip")
-_ = vipModels
 ```
 
+`GetUserModels` is for playground usable-group listing and should not be used
+as the source of truth for subscription unlocks.
 ### Scan-to-pay (Alipay / WeChat via epay)
 
 The server does **not** return a QR image. Flow:

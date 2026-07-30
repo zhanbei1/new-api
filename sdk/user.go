@@ -14,10 +14,11 @@ func (c *Client) GetSelf(ctx context.Context) (*User, error) {
 	return &user, nil
 }
 
-// GetUserModels returns enabled models for groups the current user can use.
-// Pass a non-empty group to filter to that group; if the user cannot use it
-// (e.g. subscription not purchased yet), the result is empty.
-// Pass "" to return models across all usable groups.
+// GetUserModels returns enabled models for playground UserUsableGroups.
+// Pass a non-empty group to filter to that group (empty if not usable).
+// Pass "" to union models across all usable groups — this is often broader
+// than subscription unlocks. For models of purchased plans' upgrade_group,
+// use ListActiveSubscriptionModels / GetActiveSubscriptionModels instead.
 func (c *Client) GetUserModels(ctx context.Context, group string) ([]string, error) {
 	var q url.Values
 	if group != "" {
