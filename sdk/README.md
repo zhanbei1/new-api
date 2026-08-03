@@ -177,6 +177,13 @@ if info.EnableAlipayTopUp {
 // Subscription (plan must have allow_alipay):
 subPay, err := c.RequestSubscriptionAlipayPay(ctx, planID)
 _ = subPay
+
+// Or epay channel (payment_method = alipay | wxpay):
+epayPay, err := c.RequestSubscriptionEpay(ctx, planID, "alipay")
+_ = epayPay
+
+// Or wallet balance redemption (plan allow_balance_pay):
+_ = c.RequestSubscriptionBalancePay(ctx, planID)
 ```
 
 ### Scan-to-pay (Alipay / WeChat via epay)

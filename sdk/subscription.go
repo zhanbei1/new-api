@@ -1,6 +1,9 @@
 package sdk
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // ListSubscriptionPlans returns available subscription plans.
 func (c *Client) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlanItem, error) {
@@ -78,4 +81,78 @@ func (c *Client) RequestSubscriptionAlipayPay(ctx context.Context, planID int) (
 		return nil, err
 	}
 	return &result, nil
+}
+
+// RequestSubscriptionEpay creates an epay (alipay/wxpay) checkout order for a subscription plan.
+// Response shape matches wallet RequestEpay: cashier url + form params (includes out_trade_no).
+func (c *Client) RequestSubscriptionEpay(ctx context.Context, planID int, paymentMethod string) (*EpayPayResult, error) {
+	raw, err := c.doAuthedRaw(ctx, "POST", "/api/subscription/epay/pay", nil, map[string]any{
+		"plan_id":        planID,
+		"payment_method": paymentMethod,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var envelope struct {
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+		URL     string          `json:"url"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, err
+	}
+	if envelope.Message != "success" {
+		msg := "payment request failed"
+		var errText string
+		if err := json.Unmarshal(envelope.Data, &errText); err == nil && errText != "" {
+			msg = errText
+		} else if envelope.Message != "" && envelope.Message != "error" {
+			msg = envelope.Message
+		}
+		return nil, &APIError{Message: msg}
+	}
+	params := map[string]string{}
+	if len(envelope.Data) > 0 && string(envelope.Data) != "null" {
+		if err := json.Unmarshal(envelope.Data, &params); err != nil {
+			return nil, err
+		}
+	}
+	return &EpayPayResult{URL: envelope.URL, Params: params}, nil
+}
+
+// RequestSubscriptionBalancePay purchases a plan by deducting wallet quota (allow_balance_pay).
+// Succeeds immediately; no redirect / QR.
+func (c *Client) RequestSubscriptionBalancePay(ctx context.Context, planID int) error {
+	return c.doAuthed(ctx, "POST", "/api/subscription/balance/pay", nil, map[string]int{
+		"plan_id": planID,
+	}, nil)
+}
+
+// RequestSubscriptionStripePay creates a Stripe Checkout session for a subscription plan.
+func (c *Client) RequestSubscriptionStripePay(ctx context.Context, planID int) (*StripePayResult, error) {
+	var result StripePayResult
+	if err := c.doAuthed(ctx, "POST", "/api/subscription/stripe/pay", nil, map[string]int{
+		"plan_id": planID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// SubscriptionOrderStatus is GET /api/subscription/order/status.
+type SubscriptionOrderStatus struct {
+	TradeNo string  `json:"trade_no"`
+	Status  string  `json:"status"`
+	PlanID  int     `json:"plan_id"`
+	Money   float64 `json:"money"`
+}
+
+// GetSubscriptionOrderStatus returns the current user's subscription order by trade_no.
+func (c *Client) GetSubscriptionOrderStatus(ctx context.Context, tradeNo string) (*SubscriptionOrderStatus, error) {
+	q := mapQuery("trade_no", tradeNo)
+	var status SubscriptionOrderStatus
+	if err := c.doAuthed(ctx, "GET", "/api/subscription/order/status", q, nil, &status); err != nil {
+		return nil, err
+	}
+	return &status, nil
 }
