@@ -34,7 +34,7 @@ func TestSMS(c *gin.Context) {
 		common.ApiErrorMsg(c, "SMS 服务未配置完整")
 		return
 	}
-	code := common.GenerateVerificationCode(6)
+	code := common.GenerateNumericVerificationCode(6)
 	if err := sms.SendVerificationCode(c.Request.Context(), phone, code); err != nil {
 		common.ApiError(c, err)
 		return
@@ -81,7 +81,7 @@ func sendSMSCode(c *gin.Context, purpose string, requireExistingUser bool) {
 		}
 	}
 
-	code := common.GenerateVerificationCode(6)
+	code := common.GenerateNumericVerificationCode(6)
 	common.RegisterVerificationCodeWithKey(phone, code, purpose)
 	if err := sms.SendVerificationCode(c.Request.Context(), phone, code); err != nil {
 		common.DeleteKey(phone, purpose)

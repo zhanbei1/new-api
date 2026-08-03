@@ -1,7 +1,9 @@
 package common
 
 import (
+	crand "crypto/rand"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +37,29 @@ func GenerateVerificationCode(length int) string {
 		return code
 	}
 	return code[:length]
+}
+
+// GenerateNumericVerificationCode returns a pure digit verification code.
+// Alibaba Cloud SMS digit-code templates require 4–6 numeric digits only.
+func GenerateNumericVerificationCode(length int) string {
+	if length < 4 {
+		length = 4
+	}
+	if length > 6 {
+		length = 6
+	}
+	maxI := big.NewInt(10)
+	digits := make([]byte, length)
+	for i := range digits {
+		n, err := crand.Int(crand.Reader, maxI)
+		if err != nil {
+			// Extremely unlikely; fall back to a deterministic-but-valid digit.
+			digits[i] = '0'
+			continue
+		}
+		digits[i] = byte('0' + n.Int64())
+	}
+	return string(digits)
 }
 
 func verificationStorageKey(purpose, key string) string {
