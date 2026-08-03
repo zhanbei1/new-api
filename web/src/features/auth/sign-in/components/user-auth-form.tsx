@@ -401,6 +401,13 @@ export function UserAuthForm({
     </>
   )
 
+  let smsSendCodeLabel = t('Send code')
+  if (isSMSActive) {
+    smsSendCodeLabel = t('Resend ({{seconds}}s)', { seconds: smsSecondsLeft })
+  } else if (isSendingSMS) {
+    smsSendCodeLabel = t('Sending...')
+  }
+
   return (
     <div className={cn('grid gap-4', className)} {...props}>
       {hasAlternativeLogin && alternativeLoginMethods}
@@ -478,11 +485,7 @@ export function UserAuthForm({
                 }
                 onClick={() => void sendSMSCode(smsPhoneValue || '')}
               >
-                {isSMSActive
-                  ? t('Resend ({{seconds}}s)', { seconds: smsSecondsLeft })
-                  : isSendingSMS
-                    ? t('Sending...')
-                    : t('Send code')}
+                {smsSendCodeLabel}
               </Button>
             </div>
             {isTurnstileEnabled && (

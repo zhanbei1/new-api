@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { HTMLAttributes } from 'react'
+
 import type { AuthBundle } from '@/stores/auth-store'
 
 // ============================================================================
@@ -217,6 +219,6 @@ export interface CustomOAuthProviderInfo {
 // Form Props
 // ============================================================================
 
-export interface AuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface AuthFormProps extends HTMLAttributes<HTMLDivElement> {
   redirectTo?: string
 }
