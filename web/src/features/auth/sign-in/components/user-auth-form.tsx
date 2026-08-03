@@ -40,11 +40,12 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { login, wechatLoginByCode } from '@/features/auth/api'
+import { login, loginSMS, wechatLoginByCode } from '@/features/auth/api'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
-import { loginFormSchema } from '@/features/auth/constants'
+import { loginFormSchema, smsLoginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
+import { useSMSVerification } from '@/features/auth/hooks/use-sms-verification'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import { beginPasskeyLogin, finishPasskeyLogin } from '@/features/auth/passkey'
 import type { AuthFormProps } from '@/features/auth/types'
@@ -66,6 +67,7 @@ export function UserAuthForm({
 }: AuthFormProps) {
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
+  const [loginMode, setLoginMode] = useState<'password' | 'sms'>('password')
   const [wechatCode, setWeChatCode] = useState('')
   const [agreedToLegal, setAgreedToLegal] = useState(false)
   const [passkeySupported, setPasskeySupported] = useState(false)
@@ -83,6 +85,7 @@ export function UserAuthForm({
     (status?.password_login_enabled ??
       status?.data?.password_login_enabled ??
       true) !== false
+  const phoneLoginEnabled = Boolean(status?.phone_verification)
   const {
     isTurnstileEnabled,
     turnstileSiteKey,
@@ -90,6 +93,16 @@ export function UserAuthForm({
     setTurnstileToken,
     validateTurnstile,
   } = useTurnstile()
+  const {
+    isSending: isSendingSMS,
+    secondsLeft: smsSecondsLeft,
+    isActive: isSMSActive,
+    sendCode: sendSMSCode,
+  } = useSMSVerification({
+    turnstileToken,
+    validateTurnstile,
+    purpose: 'login',
+  })
   const { handleLoginSuccess, redirectTo2FA } = useAuthRedirect()
   const setPending2FAFlowToken = useAuthStore(
     (state) => state.auth.setPending2FAFlowToken
@@ -136,6 +149,17 @@ export function UserAuthForm({
     },
   })
 
+  const smsForm = useForm<z.infer<typeof smsLoginFormSchema>>({
+    resolver: zodResolver(smsLoginFormSchema),
+    defaultValues: {
+      phone: '',
+      verification_code: '',
+    },
+  })
+
+  const smsPhoneValue = smsForm.watch('phone')
+  const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
+
   const wechatQrCodeUrl = useMemo(() => {
     return (
       status?.wechat_qrcode ||
@@ -176,6 +200,42 @@ export function UserAuthForm({
           return
         }
 
+        if (!isAuthBundle(res.data)) {
+          throw new Error(t('Login failed'))
+        }
+        await handleLoginSuccess(res.data, redirectTo)
+        toast.success(t('Welcome back!'))
+      }
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) return
+      toast.error(error instanceof Error ? error.message : loginFailedMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function onSMSSubmit(data: z.infer<typeof smsLoginFormSchema>) {
+    if (requiresLegalConsent && !agreedToLegal) {
+      toast.error(legalConsentErrorMessage)
+      return
+    }
+    if (!validateTurnstile()) return
+    setIsLoading(true)
+    try {
+      const res = await loginSMS({
+        phone: data.phone,
+        verification_code: data.verification_code,
+        turnstile: turnstileToken,
+      })
+      if (res.success) {
+        if (res.data && 'require_2fa' in res.data && res.data.require_2fa) {
+          if (!res.data.flow_token) {
+            throw new Error(t('Login flow expired. Please sign in again.'))
+          }
+          setPending2FAFlowToken(res.data.flow_token)
+          redirectTo2FA()
+          return
+        }
         if (!isAuthBundle(res.data)) {
           throw new Error(t('Login failed'))
         }
@@ -342,14 +402,118 @@ export function UserAuthForm({
   )
 
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className={cn('grid gap-4', className)}
-        {...props}
-      >
-        {hasAlternativeLogin && alternativeLoginMethods}
+    <div className={cn('grid gap-4', className)} {...props}>
+      {hasAlternativeLogin && alternativeLoginMethods}
 
+      {phoneLoginEnabled && (
+        <div className='flex gap-2'>
+          <Button
+            type='button'
+            variant={loginMode === 'password' ? 'default' : 'outline'}
+            className='flex-1'
+            onClick={() => setLoginMode('password')}
+          >
+            {t('Password login')}
+          </Button>
+          <Button
+            type='button'
+            variant={loginMode === 'sms' ? 'default' : 'outline'}
+            className='flex-1'
+            onClick={() => setLoginMode('sms')}
+          >
+            {t('SMS login')}
+          </Button>
+        </div>
+      )}
+
+      {loginMode === 'sms' && phoneLoginEnabled ? (
+        <Form {...smsForm}>
+          <form
+            onSubmit={smsForm.handleSubmit(onSMSSubmit)}
+            className='grid gap-4'
+          >
+            <FormField
+              control={smsForm.control}
+              name='phone'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Phone number')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Enter your phone number')}
+                      type='tel'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className='flex items-end gap-2'>
+              <FormField
+                control={smsForm.control}
+                name='verification_code'
+                render={({ field }) => (
+                  <FormItem className='flex-1'>
+                    <FormLabel>{t('Verification code')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t('Verification code')}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type='button'
+                variant='outline'
+                disabled={
+                  isLoading ||
+                  isSendingSMS ||
+                  isSMSActive ||
+                  !smsPhoneValue ||
+                  !turnstileReady
+                }
+                onClick={() => void sendSMSCode(smsPhoneValue || '')}
+              >
+                {isSMSActive
+                  ? t('Resend ({{seconds}}s)', { seconds: smsSecondsLeft })
+                  : isSendingSMS
+                    ? t('Sending...')
+                    : t('Send code')}
+              </Button>
+            </div>
+            {isTurnstileEnabled && (
+              <Turnstile
+                siteKey={turnstileSiteKey}
+                onVerify={setTurnstileToken}
+              />
+            )}
+            <LegalConsent
+              status={status}
+              checked={agreedToLegal}
+              onCheckedChange={setAgreedToLegal}
+            />
+            <Button type='submit' disabled={isLoading} className='w-full'>
+              {isLoading ? (
+                <Loader2 className='h-4 w-4 animate-spin' />
+              ) : (
+                <>
+                  <LogIn className='mr-2 h-4 w-4' />
+                  {t('Sign in')}
+                </>
+              )}
+            </Button>
+          </form>
+        </Form>
+      ) : (
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className='grid gap-4'
+          >
         {passwordLoginEnabled && (
           <>
             {/* Username Field */}
@@ -424,7 +588,9 @@ export function UserAuthForm({
         />
 
         {!hasAlternativeLogin && alternativeLoginMethods}
-      </form>
+          </form>
+        </Form>
+      )}
 
       {hasWeChatLogin && (
         <Dialog
@@ -491,6 +657,6 @@ export function UserAuthForm({
           </div>
         </Dialog>
       )}
-    </Form>
+    </div>
   )
 }

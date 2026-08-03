@@ -64,6 +64,34 @@ describe('payment dispatch', () => {
     assert.deepEqual(calls, ['waffo:120:3'])
   })
 
+  test('routes native Alipay provider to the alipay processor', async () => {
+    const calls: string[] = []
+    const success = await dispatchSelectedPayment(
+      {
+        name: 'Alipay',
+        type: PAYMENT_TYPES.ALIPAY,
+        provider: 'alipay',
+      },
+      50,
+      null,
+      {
+        regular: async () => {
+          calls.push('regular')
+          return false
+        },
+        waffo: async () => false,
+        waffoPancake: async () => false,
+        alipay: async (amount) => {
+          calls.push(`alipay:${amount}`)
+          return true
+        },
+      }
+    )
+
+    assert.equal(success, true)
+    assert.deepEqual(calls, ['alipay:50'])
+  })
+
   test('does not create a Waffo order without a selected method index', async () => {
     let called = false
     const success = await dispatchSelectedPayment(

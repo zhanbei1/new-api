@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { PaymentQrDialog } from '@/components/payment-qr-dialog'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { getSelf } from '@/lib/api'
@@ -79,6 +80,9 @@ export function Wallet(props: WalletProps) {
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
   const [showSubscriptionPanel, setShowSubscriptionPanel] = useState(true)
+  const [alipayQrOpen, setAlipayQrOpen] = useState(false)
+  const [alipayTradeNo, setAlipayTradeNo] = useState('')
+  const [alipayQrCode, setAlipayQrCode] = useState('')
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
@@ -96,6 +100,7 @@ export function Wallet(props: WalletProps) {
     processing,
     calculatePaymentAmount,
     processPayment,
+    processAlipayPayment,
   } = usePayment()
   const {
     affiliateLink,
@@ -202,12 +207,27 @@ export function Wallet(props: WalletProps) {
         regular: processPayment,
         waffo: processWaffoPayment,
         waffoPancake: processWaffoPancakePayment,
+        alipay: async (amount) => {
+          const data = await processAlipayPayment(amount)
+          if (!data) return false
+          setAlipayTradeNo(data.trade_no)
+          setAlipayQrCode(data.qr_code)
+          setAlipayQrOpen(true)
+          return true
+        },
       }
     )
 
     if (success) {
       setConfirmDialogOpen(false)
-      await fetchUser()
+      if (
+        !(
+          selectedPaymentMethod.type === PAYMENT_TYPES.ALIPAY &&
+          selectedPaymentMethod.provider === 'alipay'
+        )
+      ) {
+        await fetchUser()
+      }
     }
   }
 
@@ -363,6 +383,15 @@ export function Wallet(props: WalletProps) {
         processing={processing || waffoProcessing || pancakeProcessing}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}
+      />
+
+      <PaymentQrDialog
+        open={alipayQrOpen}
+        onOpenChange={setAlipayQrOpen}
+        tradeNo={alipayTradeNo}
+        qrCode={alipayQrCode}
+        statusEndpoint='/api/user/topup/status'
+        onPaid={() => void fetchUser()}
       />
 
       <TransferDialog

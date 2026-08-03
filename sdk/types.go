@@ -16,6 +16,7 @@ type User struct {
 	Role            int    `json:"role"`
 	Status          int    `json:"status"`
 	Email           string `json:"email"`
+	Phone           string `json:"phone"`
 	GitHubID        string `json:"github_id"`
 	DiscordID       string `json:"discord_id"`
 	OidcID          string `json:"oidc_id"`
@@ -100,6 +101,7 @@ type AuthProviders struct {
 	PasskeyEnabled           bool
 	RegisterEnabled          bool
 	EmailVerificationEnabled bool
+	PhoneVerificationEnabled bool
 	CustomProviders          []CustomOAuthProvider
 }
 

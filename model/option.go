@@ -39,6 +39,7 @@ func InitOptionMap() {
 	common.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(common.PasswordLoginEnabled)
 	common.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(common.PasswordRegisterEnabled)
 	common.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(common.EmailVerificationEnabled)
+	common.OptionMap["PhoneVerificationEnabled"] = strconv.FormatBool(common.PhoneVerificationEnabled)
 	common.OptionMap["GitHubOAuthEnabled"] = strconv.FormatBool(common.GitHubOAuthEnabled)
 	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
 	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
@@ -66,6 +67,11 @@ func InitOptionMap() {
 	common.OptionMap["SMTPStartTLSEnabled"] = strconv.FormatBool(common.SMTPStartTLSEnabled)
 	common.OptionMap["SMTPInsecureSkipVerify"] = strconv.FormatBool(common.SMTPInsecureSkipVerify)
 	common.OptionMap["SMTPForceAuthLogin"] = strconv.FormatBool(common.SMTPForceAuthLogin)
+	common.OptionMap["SMSProviderType"] = common.SMSProviderType
+	common.OptionMap["SMSClientId"] = ""
+	common.OptionMap["SMSClientSecret"] = ""
+	common.OptionMap["SMSSignName"] = ""
+	common.OptionMap["SMSTemplateCode"] = ""
 	common.OptionMap["Notice"] = ""
 	common.OptionMap["About"] = ""
 	common.OptionMap["HomePageContent"] = ""
@@ -89,6 +95,15 @@ func InitOptionMap() {
 	common.OptionMap["StripePriceId"] = setting.StripePriceId
 	common.OptionMap["StripeUnitPrice"] = strconv.FormatFloat(setting.StripeUnitPrice, 'f', -1, 64)
 	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
+	common.OptionMap["AlipayAppId"] = setting.AlipayAppId
+	common.OptionMap["AlipayPrivateKey"] = setting.AlipayPrivateKey
+	common.OptionMap["AlipayAppPublicCert"] = setting.AlipayAppPublicCert
+	common.OptionMap["AlipayRootCert"] = setting.AlipayRootCert
+	common.OptionMap["AlipayPublicCert"] = setting.AlipayPublicCert
+	common.OptionMap["AlipayIsProduction"] = strconv.FormatBool(setting.AlipayIsProduction)
+	common.OptionMap["AlipayEncryptKey"] = setting.AlipayEncryptKey
+	common.OptionMap["AlipayUnitPrice"] = strconv.FormatFloat(setting.AlipayUnitPrice, 'f', -1, 64)
+	common.OptionMap["AlipayMinTopUp"] = strconv.Itoa(setting.AlipayMinTopUp)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -307,6 +322,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.PasswordLoginEnabled = boolValue
 		case "EmailVerificationEnabled":
 			common.EmailVerificationEnabled = boolValue
+		case "PhoneVerificationEnabled":
+			common.PhoneVerificationEnabled = boolValue
 		case "GitHubOAuthEnabled":
 			common.GitHubOAuthEnabled = boolValue
 		case "LinuxDOOAuthEnabled":
@@ -401,6 +418,16 @@ func updateOptionMap(key string, value string) (err error) {
 		common.SMTPFrom = value
 	case "SMTPToken":
 		common.SMTPToken = value
+	case "SMSProviderType":
+		common.SMSProviderType = value
+	case "SMSClientId":
+		common.SMSClientId = value
+	case "SMSClientSecret":
+		common.SMSClientSecret = value
+	case "SMSSignName":
+		common.SMSSignName = value
+	case "SMSTemplateCode":
+		common.SMSTemplateCode = value
 	case "ServerAddress":
 		system_setting.ServerAddress = value
 	case "WorkerUrl":
@@ -437,6 +464,24 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":
 		setting.StripePromotionCodesEnabled = value == "true"
+	case "AlipayAppId":
+		setting.AlipayAppId = value
+	case "AlipayPrivateKey":
+		setting.AlipayPrivateKey = value
+	case "AlipayAppPublicCert":
+		setting.AlipayAppPublicCert = value
+	case "AlipayRootCert":
+		setting.AlipayRootCert = value
+	case "AlipayPublicCert":
+		setting.AlipayPublicCert = value
+	case "AlipayIsProduction":
+		setting.AlipayIsProduction = value == "true"
+	case "AlipayEncryptKey":
+		setting.AlipayEncryptKey = value
+	case "AlipayUnitPrice":
+		setting.AlipayUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "AlipayMinTopUp":
+		setting.AlipayMinTopUp, _ = strconv.Atoi(value)
 	case "CreemApiKey":
 		setting.CreemApiKey = value
 	case "CreemProducts":

@@ -321,7 +321,7 @@ export function RechargeFormCard({
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
                     {topupInfo?.pay_methods?.map((method) => {
                       const minTopup = Math.max(
-                        method.min_topup || 0,
+                        Number(method.min_topup) || 0,
                         getMinTopupAmount(topupInfo)
                       )
                       const disabled = minTopup > topupAmount

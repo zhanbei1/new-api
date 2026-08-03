@@ -134,6 +134,20 @@ export async function requestStripePayment(
 }
 
 /**
+ * Request native Alipay QR payment
+ */
+export async function requestAlipayPayment(request: {
+  amount: number
+}): Promise<
+  ApiResponse<{ trade_no: string; qr_code: string; expire_at?: number }>
+> {
+  const res = await api.post('/api/user/alipay/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
  * Request Creem payment
  */
 export async function requestCreemPayment(

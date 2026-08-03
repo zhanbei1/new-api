@@ -46,6 +46,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 import { confirmPaymentCompliance } from '../api'
@@ -147,6 +148,15 @@ const paymentSchema = z.object({
   StripeUnitPrice: z.coerce.number().min(0),
   StripeMinTopUp: z.coerce.number().min(0),
   StripePromotionCodesEnabled: z.boolean(),
+  AlipayAppId: z.string(),
+  AlipayPrivateKey: z.string(),
+  AlipayAppPublicCert: z.string(),
+  AlipayRootCert: z.string(),
+  AlipayPublicCert: z.string(),
+  AlipayIsProduction: z.boolean(),
+  AlipayEncryptKey: z.string(),
+  AlipayUnitPrice: z.coerce.number().min(0),
+  AlipayMinTopUp: z.coerce.number().min(0),
   CreemApiKey: z.string(),
   CreemWebhookSecret: z.string(),
   CreemTestMode: z.boolean(),
@@ -433,6 +443,15 @@ export function PaymentSettingsSection({
       StripeUnitPrice: values.StripeUnitPrice,
       StripeMinTopUp: values.StripeMinTopUp,
       StripePromotionCodesEnabled: values.StripePromotionCodesEnabled,
+      AlipayAppId: values.AlipayAppId.trim(),
+      AlipayPrivateKey: values.AlipayPrivateKey.trim(),
+      AlipayAppPublicCert: values.AlipayAppPublicCert.trim(),
+      AlipayRootCert: values.AlipayRootCert.trim(),
+      AlipayPublicCert: values.AlipayPublicCert.trim(),
+      AlipayIsProduction: values.AlipayIsProduction,
+      AlipayEncryptKey: values.AlipayEncryptKey.trim(),
+      AlipayUnitPrice: values.AlipayUnitPrice,
+      AlipayMinTopUp: values.AlipayMinTopUp,
       CreemApiKey: values.CreemApiKey.trim(),
       CreemWebhookSecret: values.CreemWebhookSecret.trim(),
       CreemTestMode: values.CreemTestMode,
@@ -478,6 +497,15 @@ export function PaymentSettingsSection({
       StripeMinTopUp: initialRef.current.StripeMinTopUp,
       StripePromotionCodesEnabled:
         initialRef.current.StripePromotionCodesEnabled,
+      AlipayAppId: initialRef.current.AlipayAppId.trim(),
+      AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
+      AlipayAppPublicCert: initialRef.current.AlipayAppPublicCert.trim(),
+      AlipayRootCert: initialRef.current.AlipayRootCert.trim(),
+      AlipayPublicCert: initialRef.current.AlipayPublicCert.trim(),
+      AlipayIsProduction: initialRef.current.AlipayIsProduction,
+      AlipayEncryptKey: initialRef.current.AlipayEncryptKey.trim(),
+      AlipayUnitPrice: initialRef.current.AlipayUnitPrice,
+      AlipayMinTopUp: initialRef.current.AlipayMinTopUp,
       CreemApiKey: initialRef.current.CreemApiKey.trim(),
       CreemWebhookSecret: initialRef.current.CreemWebhookSecret.trim(),
       CreemTestMode: initialRef.current.CreemTestMode,
@@ -599,6 +627,46 @@ export function PaymentSettingsSection({
         key: 'StripePromotionCodesEnabled',
         value: sanitized.StripePromotionCodesEnabled,
       })
+    }
+
+    if (sanitized.AlipayAppId !== initial.AlipayAppId) {
+      updates.push({ key: 'AlipayAppId', value: sanitized.AlipayAppId })
+    }
+    if (sanitized.AlipayPrivateKey) {
+      updates.push({ key: 'AlipayPrivateKey', value: sanitized.AlipayPrivateKey })
+    }
+    if (sanitized.AlipayAppPublicCert !== initial.AlipayAppPublicCert) {
+      updates.push({
+        key: 'AlipayAppPublicCert',
+        value: sanitized.AlipayAppPublicCert,
+      })
+    }
+    if (sanitized.AlipayRootCert !== initial.AlipayRootCert) {
+      updates.push({ key: 'AlipayRootCert', value: sanitized.AlipayRootCert })
+    }
+    if (sanitized.AlipayPublicCert !== initial.AlipayPublicCert) {
+      updates.push({
+        key: 'AlipayPublicCert',
+        value: sanitized.AlipayPublicCert,
+      })
+    }
+    if (sanitized.AlipayIsProduction !== initial.AlipayIsProduction) {
+      updates.push({
+        key: 'AlipayIsProduction',
+        value: sanitized.AlipayIsProduction,
+      })
+    }
+    if (sanitized.AlipayEncryptKey) {
+      updates.push({
+        key: 'AlipayEncryptKey',
+        value: sanitized.AlipayEncryptKey,
+      })
+    }
+    if (sanitized.AlipayUnitPrice !== initial.AlipayUnitPrice) {
+      updates.push({ key: 'AlipayUnitPrice', value: sanitized.AlipayUnitPrice })
+    }
+    if (sanitized.AlipayMinTopUp !== initial.AlipayMinTopUp) {
+      updates.push({ key: 'AlipayMinTopUp', value: sanitized.AlipayMinTopUp })
     }
 
     if (
@@ -877,10 +945,11 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[52rem] grid-cols-7'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
+                <TabsTrigger value='alipay'>{t('Alipay')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
                 <TabsTrigger value='waffo'>Waffo</TabsTrigger>
@@ -1432,6 +1501,215 @@ export function PaymentSettingsSection({
                             {t('Allow users to enter promo codes')}
                           </FormDescription>
                         </SettingsSwitchContent>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </SettingsSwitchItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value='alipay' className={paymentTabContentClassName}>
+              <div className='space-y-4'>
+                <div>
+                  <h3 className='text-lg font-medium'>{t('Alipay Gateway')}</h3>
+                  <p className='text-muted-foreground text-sm'>
+                    {t(
+                      'Native Alipay scan-to-pay (certificate mode). Paste PEM certificate contents below.'
+                    )}
+                  </p>
+                </div>
+
+                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+                  <p className='mb-2 font-medium'>
+                    {t('Webhook Configuration:')}
+                  </p>
+                  <ul className='list-inside list-disc space-y-1'>
+                    <li>
+                      {t('Notify URL:')}{' '}
+                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                        {'<ServerAddress>/api/alipay/notify'}
+                      </code>
+                    </li>
+                    <li>
+                      {t(
+                        'Configure the notify URL in the Alipay Open Platform application settings'
+                      )}
+                    </li>
+                  </ul>
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='AlipayAppId'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('App ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={t('Alipay application AppID')}
+                            autoComplete='off'
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='AlipayEncryptKey'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Encrypt key (optional)')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='password'
+                            placeholder={t('Leave blank if unused')}
+                            autoComplete='new-password'
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name='AlipayPrivateKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Application private key')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={4}
+                          className='font-mono text-xs'
+                          placeholder={t('Paste PEM or raw private key')}
+                          autoComplete='off'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Leave blank unless rotating the secret')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='AlipayAppPublicCert'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Application public certificate')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={4}
+                          className='font-mono text-xs'
+                          placeholder={t('Paste appCertPublicKey.crt content')}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='AlipayRootCert'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Alipay root certificate')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={4}
+                          className='font-mono text-xs'
+                          placeholder={t('Paste alipayRootCert.crt content')}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='AlipayPublicCert'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Alipay public certificate')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={4}
+                          className='font-mono text-xs'
+                          placeholder={t(
+                            'Paste alipayCertPublicKey_RSA2.crt content'
+                          )}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className='grid gap-6 md:grid-cols-3'>
+                  <FormField
+                    control={form.control}
+                    name='AlipayUnitPrice'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Unit price')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            step='0.01'
+                            min={0}
+                            {...safeNumberFieldProps(field)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='AlipayMinTopUp'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Minimum top-up')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            step='1'
+                            min={0}
+                            {...safeNumberFieldProps(field)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='AlipayIsProduction'
+                    render={({ field }) => (
+                      <SettingsSwitchItem>
+                        <FormLabel>{t('Production mode')}</FormLabel>
                         <FormControl>
                           <Switch
                             checked={field.value}

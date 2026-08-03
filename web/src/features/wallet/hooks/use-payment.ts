@@ -27,6 +27,7 @@ import {
   calculateWaffoPancakeAmount,
   requestPayment,
   requestStripePayment,
+  requestAlipayPayment,
   isApiSuccess,
 } from '../api'
 import {
@@ -157,12 +158,36 @@ export function usePayment() {
     []
   )
 
+  const processAlipayPayment = useCallback(async (topupAmount: number) => {
+    try {
+      setProcessing(true)
+      const response = await requestAlipayPayment({
+        amount: Math.floor(topupAmount),
+      })
+      if (response.message !== 'success' || !response.data?.qr_code) {
+        toast.error(
+          (response.message && response.message !== 'success'
+            ? response.message
+            : null) || i18next.t('Payment request failed')
+        )
+        return null
+      }
+      return response.data
+    } catch {
+      toast.error(i18next.t('Payment request failed'))
+      return null
+    } finally {
+      setProcessing(false)
+    }
+  }, [])
+
   return {
     amount,
     calculating,
     processing,
     calculatePaymentAmount,
     processPayment,
+    processAlipayPayment,
     setAmount,
   }
 }

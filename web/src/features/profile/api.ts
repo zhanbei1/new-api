@@ -125,6 +125,34 @@ export async function bindEmail(
 }
 
 /**
+ * Send SMS verification code for phone bind / register
+ */
+export async function sendSMSVerification(
+  phone: string,
+  turnstileToken?: string
+): Promise<ApiResponse> {
+  const res = await api.post('/api/sms/verification', {
+    phone,
+    turnstile: turnstileToken,
+  })
+  return res.data
+}
+
+/**
+ * Bind phone number
+ */
+export async function bindPhone(
+  phone: string,
+  code: string
+): Promise<ApiResponse> {
+  const res = await api.post('/api/oauth/phone/bind', {
+    phone,
+    code,
+  })
+  return res.data
+}
+
+/**
  * Bind WeChat account
  */
 export async function bindWeChat(code: string): Promise<ApiResponse> {

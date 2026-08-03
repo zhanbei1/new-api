@@ -117,6 +117,8 @@ func loginMethodFromContext(c *gin.Context) string {
 	switch c.FullPath() {
 	case "/api/user/login":
 		return "password"
+	case "/api/user/login/sms":
+		return "sms"
 	case "/api/user/login/2fa":
 		return "2fa"
 	case "/api/user/passkey/login/finish":
@@ -220,6 +222,7 @@ func Register(c *gin.Context) {
 	}
 	user.Username = strings.TrimSpace(user.Username)
 	user.Email = model.NormalizeEmail(user.Email)
+	user.Phone = model.NormalizePhone(user.Phone)
 	if user.Username == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
@@ -243,6 +246,28 @@ func Register(c *gin.Context) {
 				return
 			}
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+			return
+		}
+	}
+	if common.PhoneVerificationEnabled {
+		phoneCode := user.PhoneVerificationCode
+		if phoneCode == "" {
+			phoneCode = user.VerificationCode
+		}
+		if user.Phone == "" || phoneCode == "" {
+			common.ApiErrorMsg(c, "请填写手机号和验证码")
+			return
+		}
+		if !model.IsValidPhone(user.Phone) {
+			common.ApiErrorMsg(c, "手机号格式不正确")
+			return
+		}
+		if !common.VerifyCodeWithKey(user.Phone, phoneCode, common.PhoneVerificationPurpose) {
+			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+			return
+		}
+		if model.IsPhoneAlreadyTaken(user.Phone) {
+			common.ApiErrorMsg(c, "该手机号已被占用")
 			return
 		}
 	}
@@ -271,6 +296,9 @@ func Register(c *gin.Context) {
 	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
+	}
+	if common.PhoneVerificationEnabled {
+		cleanUser.Phone = user.Phone
 	}
 	if err := cleanUser.Insert(inviterId); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {

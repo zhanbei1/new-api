@@ -148,6 +148,15 @@ export async function paySubscriptionCreem(
   return res.data
 }
 
+export async function paySubscriptionAlipay(
+  data: SubscriptionPayRequest
+): Promise<
+  ApiResponse<{ trade_no: string; qr_code: string; expire_at?: number }>
+> {
+  const res = await api.post('/api/subscription/alipay/pay', data)
+  return res.data
+}
+
 export async function paySubscriptionWaffoPancake(
   data: SubscriptionPayRequest
 ): Promise<SubscriptionPayResponse> {

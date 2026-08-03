@@ -67,3 +67,15 @@ func (c *Client) GetActiveSubscriptionModels(ctx context.Context) ([]string, err
 	}
 	return models, nil
 }
+
+// RequestSubscriptionAlipayPay creates a native Alipay scan-to-pay order for a subscription plan.
+// The plan must have allow_alipay enabled. Returns the same AlipayPayResult shape as wallet top-up.
+func (c *Client) RequestSubscriptionAlipayPay(ctx context.Context, planID int) (*AlipayPayResult, error) {
+	var result AlipayPayResult
+	if err := c.doAuthed(ctx, "POST", "/api/subscription/alipay/pay", nil, map[string]int{
+		"plan_id": planID,
+	}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

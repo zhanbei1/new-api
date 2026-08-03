@@ -37,8 +37,16 @@ export interface RegisterPayload {
   username: string
   password: string
   email?: string
+  phone?: string
   verification_code?: string
+  phone_verification_code?: string
   aff_code?: string
+  turnstile?: string
+}
+
+export interface SMSLoginPayload {
+  phone: string
+  verification_code: string
   turnstile?: string
 }
 
@@ -118,6 +126,7 @@ export interface SystemStatus {
     turnstile_check?: boolean
     turnstile_site_key?: string
     email_verification?: boolean
+    phone_verification?: boolean
     self_use_mode_enabled?: boolean
     display_in_currency?: boolean
     display_token_stat_enabled?: boolean
@@ -162,6 +171,7 @@ export interface SystemStatus {
   turnstile_check?: boolean
   turnstile_site_key?: string
   email_verification?: boolean
+  phone_verification?: boolean
   self_use_mode_enabled?: boolean
   display_in_currency?: boolean
   display_token_stat_enabled?: boolean
@@ -207,6 +217,6 @@ export interface CustomOAuthProviderInfo {
 // Form Props
 // ============================================================================
 
-export interface AuthFormProps extends React.HTMLAttributes<HTMLFormElement> {
+export interface AuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
   redirectTo?: string
 }

@@ -73,14 +73,17 @@ func main() {
 
 | Method | Endpoint |
 |--------|----------|
-| `Register` / `Login` | `/api/user/register`, `/api/user/login` |
+| `Register` / `Login` / `LoginSMS` | `/api/user/register`, `/api/user/login`, `/api/user/login/sms` |
 | `SendEmailVerification` / `BindEmail` | `/api/verification`, `/api/oauth/email/bind` |
+| `SendSMSVerification` / `SendSMSLoginCode` / `BindPhone` | `/api/sms/verification`, `/api/sms/login`, `/api/oauth/phone/bind` |
 | `DeleteSelf` | `/api/user/self` |
 | `GetSelf` / `UpdateSelf` | `/api/user/self` |
 | `GetAffCode` | `/api/user/aff` |
 | `ListTopUps` | `/api/user/topup/self` |
 | `GetTopUpInfo` / `RequestAmount` / `RequestEpay` | `/api/user/topup/info`, `/amount`, `/pay` |
 | `RequestStripePay` / `RequestCreemPay` | `/api/user/stripe/pay`, `/creem/pay` |
+| `RequestAlipayPay` | `/api/user/alipay/pay` |
+| `RequestSubscriptionAlipayPay` | `/api/subscription/alipay/pay` |
 | `WaitTopUpByTradeNo` | polls `/api/user/topup/self` |
 | `ListAuthProviders` | `/api/status` |
 | `WeChatLogin` | `/api/oauth/wechat` |
@@ -140,6 +143,42 @@ fmt.Println(models)
 
 `GetUserModels` is for playground usable-group listing and should not be used
 as the source of truth for subscription unlocks.
+
+### SMS login / phone bind
+
+When `ListAuthProviders` reports `PhoneVerificationEnabled`:
+
+```go
+_ = c.SendSMSLoginCode(ctx, "13800138000", "")
+res, err := c.LoginSMS(ctx, "13800138000", "123456")
+// after login: c.BindPhone(ctx, phone, code) with SendSMSVerification
+_ = res
+```
+
+Register with phone OTP (when required): set `Phone` + `PhoneVerificationCode` on `RegisterRequest`
+(after `SendSMSVerification`).
+
+### Native Alipay scan-to-pay
+
+Unlike epay, native Alipay returns a `qr_code` string (Alipay cashier URL) to render as a QR image:
+
+```go
+info, _ := c.GetTopUpInfo(ctx)
+if info.EnableAlipayTopUp {
+	pay, err := c.RequestAlipayPay(ctx, sdk.AlipayPayRequest{Amount: 10})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("trade:", pay.TradeNo, "qr:", pay.QRCode)
+	order, err := c.WaitTopUpByTradeNo(ctx, pay.TradeNo, sdk.WaitTopUpOptions{})
+	_ = order
+}
+
+// Subscription (plan must have allow_alipay):
+subPay, err := c.RequestSubscriptionAlipayPay(ctx, planID)
+_ = subPay
+```
+
 ### Scan-to-pay (Alipay / WeChat via epay)
 
 The server does **not** return a QR image. Flow:

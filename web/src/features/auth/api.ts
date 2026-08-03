@@ -210,3 +210,53 @@ export async function bindEmail(
   })
   return res.data
 }
+
+export async function sendSMSVerification(
+  phone: string,
+  turnstile?: string
+): Promise<ApiResponse> {
+  const res = await api.post('/api/sms/verification', {
+    phone,
+    turnstile,
+  })
+  return res.data
+}
+
+export async function sendSMSLoginCode(
+  phone: string,
+  turnstile?: string
+): Promise<ApiResponse> {
+  const res = await api.post('/api/sms/login', {
+    phone,
+    turnstile,
+  })
+  return res.data
+}
+
+export async function loginSMS(payload: {
+  phone: string
+  verification_code: string
+  turnstile?: string
+}): Promise<LoginResponse> {
+  const turnstile = payload.turnstile ?? ''
+  const res = await api.post<LoginResponse>(
+    `/api/user/login/sms?turnstile=${turnstile}`,
+    {
+      phone: payload.phone,
+      verification_code: payload.verification_code,
+    },
+    { skipAuthRefresh: true }
+  )
+  return res.data
+}
+
+export async function bindPhone(
+  phone: string,
+  code: string
+): Promise<ApiResponse> {
+  const res = await api.post('/api/oauth/phone/bind', {
+    phone,
+    code,
+  })
+  return res.data
+}

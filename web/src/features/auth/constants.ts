@@ -31,6 +31,7 @@ export const registerFormSchema = z
   .object({
     username: z.string().min(1, 'Please enter your username'),
     email: z.string().optional(),
+    phone: z.string().optional(),
     password: z
       .string()
       .min(1, 'Please enter your password')
@@ -42,6 +43,11 @@ export const registerFormSchema = z
     message: "Passwords don't match.",
     path: ['confirmPassword'],
   })
+
+export const smsLoginFormSchema = z.object({
+  phone: z.string().min(1, 'Please enter your phone number'),
+  verification_code: z.string().min(1, 'Please enter the verification code'),
+})
 
 export const forgotPasswordFormSchema = z.object({
   email: z.string().email({
@@ -69,6 +75,7 @@ export const OTP_REGEX = /^\d{6}$/
 // ============================================================================
 
 export const EMAIL_VERIFICATION_COUNTDOWN = 30 // seconds
+export const SMS_VERIFICATION_COUNTDOWN = 30 // seconds
 export const PASSWORD_RESET_COUNTDOWN = 30 // seconds
 
 // ============================================================================

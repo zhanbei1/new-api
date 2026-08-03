@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Dialog } from '@/components/dialog'
+import { PaymentQrDialog } from '@/components/payment-qr-dialog'
 import { GroupBadge } from '@/components/group-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ import {
   paySubscriptionEpay,
   paySubscriptionWaffoPancake,
   paySubscriptionBalance,
+  paySubscriptionAlipay,
 } from '../../api'
 import { formatDuration, formatResetPeriod } from '../../lib'
 import type { PlanRecord } from '../../types'
@@ -60,6 +62,7 @@ interface Props {
   enableStripe?: boolean
   enableCreem?: boolean
   enableWaffoPancake?: boolean
+  enableAlipay?: boolean
   enableOnlineTopUp?: boolean
   epayMethods?: PaymentMethod[]
   purchaseLimit?: number
@@ -73,6 +76,9 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const { currency } = useSystemConfig()
   const [paying, setPaying] = useState(false)
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('')
+  const [alipayQrOpen, setAlipayQrOpen] = useState(false)
+  const [alipayTradeNo, setAlipayTradeNo] = useState('')
+  const [alipayQrCode, setAlipayQrCode] = useState('')
 
   useEffect(() => {
     if (props.open && props.epayMethods && props.epayMethods.length > 0) {
@@ -89,9 +95,11 @@ export function SubscriptionPurchaseDialog(props: Props) {
   const hasCreem = props.enableCreem && !!plan.creem_product_id
   const hasWaffoPancake =
     props.enableWaffoPancake && !!plan.waffo_pancake_product_id
+  const hasAlipay = props.enableAlipay && plan.allow_alipay === true
   const hasEpay =
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
-  const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
+  const hasAnyPayment =
+    hasStripe || hasCreem || hasWaffoPancake || hasEpay || hasAlipay
   const selectedEpayMethodLabel =
     (props.epayMethods || []).find((m) => m.type === selectedEpayMethod)
       ?.name ||
@@ -150,6 +158,25 @@ export function SubscriptionPurchaseDialog(props: Props) {
             ? res.message
             : t('Payment request failed')
         )
+      }
+    } catch {
+      toast.error(t('Payment request failed'))
+    } finally {
+      setPaying(false)
+    }
+  }
+
+  const handlePayAlipay = async () => {
+    setPaying(true)
+    try {
+      const res = await paySubscriptionAlipay({ plan_id: plan.id })
+      if (res.success && res.data?.qr_code) {
+        setAlipayTradeNo(res.data.trade_no)
+        setAlipayQrCode(res.data.qr_code)
+        setAlipayQrOpen(true)
+        props.onOpenChange(false)
+      } else {
+        toast.error(res.message || t('Payment request failed'))
       }
     } catch {
       toast.error(t('Payment request failed'))
@@ -256,6 +283,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
   }
 
   return (
+    <>
     <Dialog
       open={props.open}
       onOpenChange={props.onOpenChange}
@@ -368,7 +396,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
             <p className='text-muted-foreground text-xs'>
               {t('Select payment method')}
             </p>
-            {(hasStripe || hasCreem || hasWaffoPancake) && (
+            {(hasStripe || hasCreem || hasWaffoPancake || hasAlipay) && (
               <div className='grid grid-cols-2 gap-2 sm:flex'>
                 {hasStripe && (
                   <Button
@@ -398,6 +426,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
                     disabled={paying || limitReached}
                   >
                     Waffo Pancake
+                  </Button>
+                )}
+                {hasAlipay && (
+                  <Button
+                    variant='outline'
+                    className='flex-1'
+                    onClick={() => void handlePayAlipay()}
+                    disabled={paying || limitReached}
+                  >
+                    {t('Alipay')}
                   </Button>
                 )}
               </div>
@@ -440,5 +478,14 @@ export function SubscriptionPurchaseDialog(props: Props) {
         )}
       </div>
     </Dialog>
+    <PaymentQrDialog
+      open={alipayQrOpen}
+      onOpenChange={setAlipayQrOpen}
+      tradeNo={alipayTradeNo}
+      qrCode={alipayQrCode}
+      statusEndpoint='/api/subscription/order/status'
+      onPaid={() => void props.onPurchaseSuccess?.()}
+    />
+    </>
   )
 }

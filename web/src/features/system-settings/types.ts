@@ -124,6 +124,7 @@ export type AuthSettings = {
   PasswordLoginEnabled: boolean
   PasswordRegisterEnabled: boolean
   EmailVerificationEnabled: boolean
+  PhoneVerificationEnabled: boolean
   RegisterEnabled: boolean
   EmailDomainRestrictionEnabled: boolean
   EmailAliasRestrictionEnabled: boolean
@@ -298,6 +299,15 @@ export type BillingSettings = {
   StripeUnitPrice: number
   StripeMinTopUp: number
   StripePromotionCodesEnabled: boolean
+  AlipayAppId: string
+  AlipayPrivateKey: string
+  AlipayAppPublicCert: string
+  AlipayRootCert: string
+  AlipayPublicCert: string
+  AlipayIsProduction: boolean
+  AlipayEncryptKey: string
+  AlipayUnitPrice: number
+  AlipayMinTopUp: number
   CreemApiKey: string
   CreemWebhookSecret: string
   CreemTestMode: boolean
@@ -343,6 +353,11 @@ export type OperationsSettings = {
   SMTPStartTLSEnabled: boolean
   SMTPInsecureSkipVerify: boolean
   SMTPForceAuthLogin: boolean
+  SMSProviderType: string
+  SMSClientId: string
+  SMSClientSecret: string
+  SMSSignName: string
+  SMSTemplateCode: string
   WorkerUrl: string
   WorkerValidKey: string
   WorkerAllowHttpImageRequestEnabled: boolean

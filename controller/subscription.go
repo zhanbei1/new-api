@@ -347,6 +347,9 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		if req.Plan.AllowWalletOverflow != nil {
 			updateMap["allow_wallet_overflow"] = *req.Plan.AllowWalletOverflow
 		}
+		if req.Plan.AllowAlipay != nil {
+			updateMap["allow_alipay"] = *req.Plan.AllowAlipay
+		}
 		if err := tx.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Updates(updateMap).Error; err != nil {
 			return err
 		}

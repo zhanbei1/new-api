@@ -97,9 +97,11 @@ export interface PaymentMethod {
   /** Legacy optional color for UI display */
   color?: string
   /** Minimum topup amount for this payment method */
-  min_topup?: number
+  min_topup?: number | string
   /** Optional react-icons component name or safe icon URL */
   icon?: string
+  /** Optional payment provider (e.g. native alipay vs epay) */
+  provider?: string
 }
 
 /**
@@ -124,6 +126,10 @@ export interface TopupInfo {
   enable_online_topup: boolean
   /** Whether Stripe topup is enabled */
   enable_stripe_topup: boolean
+  /** Whether native Alipay topup is enabled */
+  enable_alipay_topup?: boolean
+  /** Minimum topup amount for Alipay */
+  alipay_min_topup?: number
   /** Available payment methods */
   pay_methods: PaymentMethod[]
   /** Minimum topup amount for online topup */

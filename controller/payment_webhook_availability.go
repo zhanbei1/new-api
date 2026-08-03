@@ -3,6 +3,7 @@ package controller
 import (
 	"strings"
 
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
@@ -97,6 +98,17 @@ func isEpayTopUpEnabled() bool {
 		return false
 	}
 	return isEpayWebhookConfigured() && len(operation_setting.PayMethods) > 0
+}
+
+func isAlipayTopUpEnabled() bool {
+	if !isPaymentComplianceConfirmed() {
+		return false
+	}
+	return service.IsAlipayConfigured()
+}
+
+func isAlipayWebhookEnabled() bool {
+	return isAlipayTopUpEnabled()
 }
 
 func isEpayWebhookConfigured() bool {

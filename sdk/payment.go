@@ -31,11 +31,13 @@ type TopUpInfo struct {
 	EnableOnlineTopUp       bool               `json:"enable_online_topup"`
 	EnableStripeTopUp       bool               `json:"enable_stripe_topup"`
 	EnableCreemTopUp        bool               `json:"enable_creem_topup"`
+	EnableAlipayTopUp       bool               `json:"enable_alipay_topup"`
 	EnableWaffoTopUp        bool               `json:"enable_waffo_topup"`
 	EnableWaffoPancakeTopUp bool               `json:"enable_waffo_pancake_topup"`
 	PayMethods              []PayMethod        `json:"pay_methods"`
 	MinTopup                int                `json:"min_topup"`
 	StripeMinTopup          int                `json:"stripe_min_topup"`
+	AlipayMinTopup          int                `json:"alipay_min_topup"`
 	AmountOptions           []int              `json:"amount_options"`
 	Discount                map[string]float64 `json:"discount"`
 	EnableRedemption        bool               `json:"enable_redemption"`
@@ -234,6 +236,28 @@ func (c *Client) RequestCreemPay(ctx context.Context, req CreemPayRequest) (*Cre
 	}
 	var result CreemPayResult
 	if err := c.doAuthed(ctx, "POST", "/api/user/creem/pay", nil, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// AlipayPayRequest creates a native Alipay scan-to-pay top-up order.
+type AlipayPayRequest struct {
+	Amount int64 `json:"amount"`
+}
+
+// AlipayPayResult contains the merchant trade number and Alipay cashier QR URL.
+// Render QRCode as a QR image (unlike epay, which returns an HTML form redirect).
+type AlipayPayResult struct {
+	TradeNo  string `json:"trade_no"`
+	QRCode   string `json:"qr_code"`
+	ExpireAt int64  `json:"expire_at,omitempty"`
+}
+
+// RequestAlipayPay creates a native Alipay TradePreCreate order and returns qr_code.
+func (c *Client) RequestAlipayPay(ctx context.Context, req AlipayPayRequest) (*AlipayPayResult, error) {
+	var result AlipayPayResult
+	if err := c.doAuthed(ctx, "POST", "/api/user/alipay/pay", nil, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

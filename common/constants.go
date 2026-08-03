@@ -62,6 +62,7 @@ var MaxRecentItems = 1000
 var PasswordLoginEnabled = true
 var PasswordRegisterEnabled = true
 var EmailVerificationEnabled = false
+var PhoneVerificationEnabled = false
 var GitHubOAuthEnabled = false
 var LinuxDOOAuthEnabled = false
 var WeChatAuthEnabled = false
@@ -104,6 +105,13 @@ var SMTPForceAuthLogin = false
 var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""
+
+// SMS settings (extensible provider; currently Alibaba Cloud SMS)
+var SMSProviderType = "alibaba"
+var SMSClientId = ""
+var SMSClientSecret = ""
+var SMSSignName = ""
+var SMSTemplateCode = ""
 
 var GitHubClientId = ""
 var GitHubClientSecret = ""

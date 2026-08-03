@@ -44,6 +44,7 @@ import { OAuthProviders } from '@/features/auth/components/oauth-providers'
 import { registerFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useEmailVerification } from '@/features/auth/hooks/use-email-verification'
+import { useSMSVerification } from '@/features/auth/hooks/use-sms-verification'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
 import {
   getAffiliateCode,
@@ -61,6 +62,7 @@ export function SignUpForm({
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
+  const [phoneVerificationCode, setPhoneVerificationCode] = useState('')
   const [agreedToLegal, setAgreedToLegal] = useState(false)
   const [wechatCode, setWeChatCode] = useState('')
   const [isWeChatDialogOpen, setIsWeChatDialogOpen] = useState(false)
@@ -86,19 +88,32 @@ export function SignUpForm({
     turnstileToken,
     validateTurnstile,
   })
+  const {
+    isSending: isSendingSMS,
+    secondsLeft: smsSecondsLeft,
+    isActive: isSMSActive,
+    sendCode: sendSMSCode,
+  } = useSMSVerification({
+    turnstileToken,
+    validateTurnstile,
+    purpose: 'verification',
+  })
 
   const form = useForm<z.infer<typeof registerFormSchema>>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
       username: '',
       email: '',
+      phone: '',
       password: '',
       confirmPassword: '',
     },
   })
 
   const emailValue = form.watch('email')
+  const phoneValue = form.watch('phone')
   const emailVerificationRequired = !!status?.email_verification
+  const phoneVerificationRequired = !!status?.phone_verification
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
   const requiresLegalConsent = hasUserAgreement || hasPrivacyPolicy
@@ -155,6 +170,16 @@ export function SignUpForm({
         return
       }
     }
+    if (phoneVerificationRequired) {
+      if (!data.phone) {
+        toast.error(t('Please enter your phone number'))
+        return
+      }
+      if (!phoneVerificationCode) {
+        toast.error(t('Please enter the phone verification code'))
+        return
+      }
+    }
 
     if (!validateTurnstile()) return
 
@@ -164,7 +189,9 @@ export function SignUpForm({
         username: data.username,
         password: data.password,
         email: data.email || undefined,
+        phone: data.phone || undefined,
         verification_code: verificationCode || undefined,
+        phone_verification_code: phoneVerificationCode || undefined,
         aff_code: getAffiliateCode(),
         turnstile: turnstileToken,
       })
@@ -341,6 +368,57 @@ export function SignUpForm({
                 onClick={handleSendVerificationCode}
               >
                 {verificationCodeAction}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {phoneVerificationRequired && (
+          <>
+            <FormField
+              control={form.control}
+              name='phone'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Phone (required for verification)')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Enter your phone number')}
+                      type='tel'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className='flex items-end gap-2'>
+              <div className='flex-1'>
+                <Input
+                  placeholder={t('Phone verification code')}
+                  value={phoneVerificationCode}
+                  onChange={(e) => setPhoneVerificationCode(e.target.value)}
+                />
+              </div>
+              <Button
+                variant='outline'
+                type='button'
+                disabled={
+                  isLoading ||
+                  isSendingSMS ||
+                  isSMSActive ||
+                  !phoneValue ||
+                  !turnstileReady
+                }
+                onClick={() => void sendSMSCode(phoneValue || '')}
+              >
+                {isSMSActive
+                  ? t('Resend ({{seconds}}s)', { seconds: smsSecondsLeft })
+                  : isSendingSMS
+                    ? t('Sending...')
+                    : t('Send code')}
               </Button>
             </div>
           </>

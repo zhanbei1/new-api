@@ -9,11 +9,13 @@ import (
 
 // RegisterRequest is the password registration payload.
 type RegisterRequest struct {
-	Username         string `json:"username"`
-	Password         string `json:"password"`
-	Email            string `json:"email,omitempty"`
-	VerificationCode string `json:"verification_code,omitempty"`
-	AffCode          string `json:"aff_code,omitempty"`
+	Username              string `json:"username"`
+	Password              string `json:"password"`
+	Email                 string `json:"email,omitempty"`
+	Phone                 string `json:"phone,omitempty"`
+	VerificationCode      string `json:"verification_code,omitempty"`
+	PhoneVerificationCode string `json:"phone_verification_code,omitempty"`
+	AffCode               string `json:"aff_code,omitempty"`
 }
 
 // Register creates a new user account.
@@ -21,6 +23,9 @@ type RegisterRequest struct {
 // (not returned here; call Login then GetAPIKey).
 // When the server enables email verification, set Email + VerificationCode
 // (obtain the code via SendEmailVerification first).
+// When phone verification is enabled, set Phone + PhoneVerificationCode
+// (or VerificationCode alone if only phone verification is on); obtain the
+// code via SendSMSVerification first.
 func (c *Client) Register(ctx context.Context, req RegisterRequest) error {
 	return c.doPublic(ctx, "POST", "/api/user/register", nil, req, nil)
 }
@@ -45,6 +50,35 @@ func (c *Client) BindEmail(ctx context.Context, email, code string) error {
 	}, nil)
 }
 
+// SendSMSVerification sends a registration/bind SMS verification code.
+// Endpoint: POST /api/sms/verification
+func (c *Client) SendSMSVerification(ctx context.Context, phone, turnstile string) error {
+	body := map[string]string{"phone": phone}
+	if turnstile != "" {
+		body["turnstile"] = turnstile
+	}
+	return c.doPublic(ctx, "POST", "/api/sms/verification", nil, body, nil)
+}
+
+// SendSMSLoginCode sends a login SMS verification code.
+// Endpoint: POST /api/sms/login
+func (c *Client) SendSMSLoginCode(ctx context.Context, phone, turnstile string) error {
+	body := map[string]string{"phone": phone}
+	if turnstile != "" {
+		body["turnstile"] = turnstile
+	}
+	return c.doPublic(ctx, "POST", "/api/sms/login", nil, body, nil)
+}
+
+// BindPhone binds a phone number to the current logged-in user using a code
+// previously sent via SendSMSVerification.
+func (c *Client) BindPhone(ctx context.Context, phone, code string) error {
+	return c.doAuthed(ctx, "POST", "/api/oauth/phone/bind", nil, map[string]string{
+		"phone": phone,
+		"code":  code,
+	}, nil)
+}
+
 // Login authenticates with username/password and stores the access token on the client.
 //
 // Supports two New API auth modes:
@@ -57,6 +91,24 @@ func (c *Client) Login(ctx context.Context, username, password string) (*LoginRe
 	cookies, err := c.doJSONCookies(ctx, "POST", "/api/user/login", nil, map[string]string{
 		"username": username,
 		"password": password,
+	}, "", nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.finalizeLogin(ctx, &result, cookies); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// LoginSMS authenticates with phone + SMS verification code and stores the access token.
+// Obtain the code via SendSMSLoginCode first.
+func (c *Client) LoginSMS(ctx context.Context, phone, code string) (*LoginResult, error) {
+	c.ensureCookieJar()
+	var result LoginResult
+	cookies, err := c.doJSONCookies(ctx, "POST", "/api/user/login/sms", nil, map[string]string{
+		"phone":             phone,
+		"verification_code": code,
 	}, "", nil, &result)
 	if err != nil {
 		return nil, err

@@ -30,6 +30,7 @@ func (c *Client) ListAuthProviders(ctx context.Context) (*AuthProviders, error) 
 		PasskeyEnabled:           asBool(data["passkey_login"]),
 		RegisterEnabled:          asBool(data["register_enabled"]),
 		EmailVerificationEnabled: asBool(data["email_verification"]),
+		PhoneVerificationEnabled: asBool(data["phone_verification"]),
 	}
 	if raw, ok := data["custom_oauth_providers"]; ok && raw != nil {
 		b, err := json.Marshal(raw)
