@@ -551,6 +551,7 @@ func buildSelfUserData(user *model.User) map[string]interface{} {
 		"role":              user.Role,
 		"status":            user.Status,
 		"email":             user.Email,
+		"phone":             user.Phone,
 		"github_id":         user.GitHubId,
 		"discord_id":        user.DiscordId,
 		"oidc_id":           user.OidcId,

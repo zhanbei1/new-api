@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Mail,
+  Phone,
   Globe,
   MessageCircle,
   Send,
@@ -99,6 +100,14 @@ const BUILTIN_BINDINGS: ReadonlyArray<{
     field: 'email',
     label: 'Email',
     icon: <Mail className='h-4 w-4' />,
+    statusKey: null,
+  },
+  {
+    key: 'phone',
+    field: 'phone',
+    label: 'Phone',
+    icon: <Phone className='h-4 w-4' />,
+    // Always list like email; value comes from user.phone regardless of SMS login toggle.
     statusKey: null,
   },
   {
@@ -395,7 +404,7 @@ export function UserBindingDialog(props: Props) {
                         <div className='min-w-0'>
                           <div className='flex items-center gap-1.5'>
                             <span className='text-sm font-medium'>
-                              {binding.label}
+                              {t(binding.label)}
                             </span>
                             {!binding.isEnabled && (
                               <StatusBadge
