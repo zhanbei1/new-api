@@ -15,9 +15,10 @@
     COPY ./web ./
     COPY ./VERSION /build/VERSION
     
+    # Bypass node_modules/.bin symlink: Bun Linux baseline mis-resolves relative imports.
     RUN DISABLE_ESLINT_PLUGIN='true' \
         VITE_REACT_APP_VERSION=$(cat /build/VERSION) \
-        bun run build
+        bun ./node_modules/@rsbuild/core/bin/rsbuild.js build
     
     # ------------------------------
     # Builder2: Go 编译
