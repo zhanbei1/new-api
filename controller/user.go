@@ -351,6 +351,21 @@ func Register(c *gin.Context) {
 	return
 }
 
+func CheckUsername(c *gin.Context) {
+	username := strings.TrimSpace(c.Query("username"))
+	if username == "" {
+		common.ApiErrorMsg(c, "请填写用户名")
+		return
+	}
+	exist, err := model.CheckUserExistOrDeleted(username, "")
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+		common.SysLog(fmt.Sprintf("CheckUsername error: %v", err))
+		return
+	}
+	common.ApiSuccess(c, gin.H{"exists": exist})
+}
+
 func GetAllUsers(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
@@ -904,6 +919,20 @@ func UpdateSelf(c *gin.Context) {
 	if user.Password == "$I_LOVE_U" {
 		user.Password = "" // rollback to what it should be
 		cleanUser.Password = ""
+	}
+	if strings.TrimSpace(cleanUser.Username) != "" {
+		originUser, oerr := model.GetUserById(cleanUser.Id, false)
+		if oerr == nil && originUser != nil && originUser.Username != cleanUser.Username {
+			exist, cerr := model.CheckUserExistOrDeleted(cleanUser.Username, "")
+			if cerr != nil {
+				common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+				return
+			}
+			if exist {
+				common.ApiErrorI18n(c, i18n.MsgUserExists)
+				return
+			}
+		}
 	}
 	updatePassword, err := checkUpdatePassword(user.OriginalPassword, user.Password, cleanUser.Id)
 	if err != nil {
