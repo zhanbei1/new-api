@@ -103,6 +103,38 @@ func TestAlipayLoadAppCertAcceptsLiteralNewlines(t *testing.T) {
 	require.NoError(t, client.LoadAppCertPublicKey(normalizeAlipayPEMMaterial(strings.ReplaceAll(string(certPEM), "\n", `\n`))))
 }
 
+func TestPrepareAlipayPlatformPublicKeyAcceptsPKCS1AndPKIX(t *testing.T) {
+	t.Parallel()
+
+	key := mustAlipayTestKey(t)
+	pkixDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	require.NoError(t, err)
+	pkcs1DER := x509.MarshalPKCS1PublicKey(&key.PublicKey)
+
+	pkixRaw := base64.StdEncoding.EncodeToString(pkixDER)
+	pkcs1Raw := base64.StdEncoding.EncodeToString(pkcs1DER)
+
+	for _, raw := range []string{pkixRaw, pkcs1Raw, "支付宝公钥：" + pkcs1Raw} {
+		prepared, err := prepareAlipayPlatformPublicKey(raw)
+		require.NoError(t, err, raw[:16])
+		client, err := alipay.New("2021000000000000", string(pem.EncodeToMemory(&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(key),
+		})), false)
+		require.NoError(t, err)
+		require.NoError(t, client.LoadAliPayPublicKey(prepared))
+	}
+}
+
+func TestPrepareAlipayPlatformPublicKeyRejectsPrivateKey(t *testing.T) {
+	t.Parallel()
+
+	key := mustAlipayTestKey(t)
+	raw := base64.StdEncoding.EncodeToString(x509.MarshalPKCS1PrivateKey(key))
+	_, err := prepareAlipayPlatformPublicKey(raw)
+	require.ErrorContains(t, err, "private key")
+}
+
 func TestGetAlipayClientPrefersPublicKeyMode(t *testing.T) {
 	origAppID := setting.AlipayAppId
 	origPrivateKey := setting.AlipayPrivateKey
