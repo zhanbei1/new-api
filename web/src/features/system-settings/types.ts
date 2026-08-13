@@ -301,6 +301,7 @@ export type BillingSettings = {
   StripePromotionCodesEnabled: boolean
   AlipayAppId: string
   AlipayPrivateKey: string
+  AlipayPublicKey: string
   AlipayAppPublicCert: string
   AlipayRootCert: string
   AlipayPublicCert: string

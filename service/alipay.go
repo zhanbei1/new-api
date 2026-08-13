@@ -19,6 +19,7 @@ func alipayConfigFingerprint() string {
 	return strings.Join([]string{
 		setting.AlipayAppId,
 		setting.AlipayPrivateKey,
+		setting.AlipayPublicKey,
 		setting.AlipayAppPublicCert,
 		setting.AlipayRootCert,
 		setting.AlipayPublicCert,
@@ -27,7 +28,19 @@ func alipayConfigFingerprint() string {
 	}, "|")
 }
 
+func alipayCertModeConfigured() bool {
+	return strings.TrimSpace(setting.AlipayAppPublicCert) != "" &&
+		strings.TrimSpace(setting.AlipayRootCert) != "" &&
+		strings.TrimSpace(setting.AlipayPublicCert) != ""
+}
+
+func alipayPublicKeyModeConfigured() bool {
+	return strings.TrimSpace(setting.AlipayPublicKey) != ""
+}
+
 // GetAlipayClient builds (or reuses) an Alipay client from current settings.
+// Prefers certificate mode when all three certs are set; otherwise uses
+// ordinary public-key mode with the Alipay platform public key.
 func GetAlipayClient() (*alipay.Client, error) {
 	fp := alipayConfigFingerprint()
 	alipayClientMu.Lock()
@@ -45,18 +58,33 @@ func GetAlipayClient() (*alipay.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create Alipay client: %w", wrapAlipayPrivateKeyError(privateKey, err))
 	}
-	appCert := normalizeAlipayPEMMaterial(setting.AlipayAppPublicCert)
-	if err := client.LoadAppCertPublicKey(appCert); err != nil {
-		return nil, fmt.Errorf("load Alipay app cert: %w", wrapAlipayCertError("appCertPublicKey_*.crt", appCert, err))
+
+	switch {
+	case alipayPublicKeyModeConfigured():
+		// Public-key mode and certificate mode are mutually exclusive in the SDK.
+		// Prefer explicit 支付宝公钥 when set so RSA-key users are not blocked by
+		// leftover mis-pasted "cert" fields that still contain 应用公钥 material.
+		publicKey := normalizeAlipayPEMMaterial(setting.AlipayPublicKey)
+		if err := client.LoadAliPayPublicKey(publicKey); err != nil {
+			return nil, fmt.Errorf("load Alipay public key: %w", wrapAlipayPublicKeyError(publicKey, err))
+		}
+	case alipayCertModeConfigured():
+		appCert := normalizeAlipayPEMMaterial(setting.AlipayAppPublicCert)
+		if err := client.LoadAppCertPublicKey(appCert); err != nil {
+			return nil, fmt.Errorf("load Alipay app cert: %w", wrapAlipayCertError("appCertPublicKey_*.crt", appCert, err))
+		}
+		rootCert := normalizeAlipayPEMMaterial(setting.AlipayRootCert)
+		if err := client.LoadAliPayRootCert(rootCert); err != nil {
+			return nil, fmt.Errorf("load Alipay root cert: %w", err)
+		}
+		alipayCert := normalizeAlipayPEMMaterial(setting.AlipayPublicCert)
+		if err := client.LoadAlipayCertPublicKey(alipayCert); err != nil {
+			return nil, fmt.Errorf("load Alipay public cert: %w", wrapAlipayCertError("alipayCertPublicKey_RSA2.crt", alipayCert, err))
+		}
+	default:
+		return nil, fmt.Errorf("Alipay credentials incomplete: configure either certificate mode (app/root/alipay certs) or public-key mode (支付宝公钥)")
 	}
-	rootCert := normalizeAlipayPEMMaterial(setting.AlipayRootCert)
-	if err := client.LoadAliPayRootCert(rootCert); err != nil {
-		return nil, fmt.Errorf("load Alipay root cert: %w", err)
-	}
-	alipayCert := normalizeAlipayPEMMaterial(setting.AlipayPublicCert)
-	if err := client.LoadAlipayCertPublicKey(alipayCert); err != nil {
-		return nil, fmt.Errorf("load Alipay public cert: %w", wrapAlipayCertError("alipayCertPublicKey_RSA2.crt", alipayCert, err))
-	}
+
 	if key := strings.TrimSpace(setting.AlipayEncryptKey); key != "" {
 		if err := client.SetEncryptKey(key); err != nil {
 			return nil, fmt.Errorf("set Alipay encrypt key: %w", err)
@@ -67,13 +95,12 @@ func GetAlipayClient() (*alipay.Client, error) {
 	return client, nil
 }
 
-// IsAlipayConfigured reports whether certificate-mode Alipay credentials are present.
+// IsAlipayConfigured reports whether certificate-mode or public-key-mode Alipay credentials are present.
 func IsAlipayConfigured() bool {
-	return strings.TrimSpace(setting.AlipayAppId) != "" &&
-		strings.TrimSpace(setting.AlipayPrivateKey) != "" &&
-		strings.TrimSpace(setting.AlipayAppPublicCert) != "" &&
-		strings.TrimSpace(setting.AlipayRootCert) != "" &&
-		strings.TrimSpace(setting.AlipayPublicCert) != ""
+	if strings.TrimSpace(setting.AlipayAppId) == "" || strings.TrimSpace(setting.AlipayPrivateKey) == "" {
+		return false
+	}
+	return alipayCertModeConfigured() || alipayPublicKeyModeConfigured()
 }
 
 func normalizeAlipayPEMNewlines(raw string) string {
@@ -123,6 +150,21 @@ func wrapAlipayPrivateKeyError(privateKey string, err error) error {
 	return err
 }
 
+func wrapAlipayPublicKeyError(publicKey string, err error) error {
+	if err == nil {
+		return nil
+	}
+	upper := strings.ToUpper(publicKey)
+	if strings.Contains(upper, "BEGIN CERTIFICATE") ||
+		strings.Contains(upper, "BEGIN PRIVATE KEY") ||
+		strings.Contains(upper, "BEGIN RSA PRIVATE KEY") ||
+		strings.Contains(err.Error(), "asn1:") ||
+		strings.Contains(err.Error(), "invalid") {
+		return fmt.Errorf("value is not the Alipay platform public key (支付宝公钥 from Open Platform after uploading 应用公钥); do not paste 应用公钥/私钥 or certificates: %w", err)
+	}
+	return err
+}
+
 func wrapAlipayCertError(filename, pem string, err error) error {
 	if err == nil {
 		return nil
@@ -133,7 +175,7 @@ func wrapAlipayCertError(filename, pem string, err error) error {
 		strings.Contains(upper, "BEGIN PRIVATE KEY") ||
 		strings.Contains(upper, "BEGIN RSA PRIVATE KEY") ||
 		strings.Contains(err.Error(), "malformed serial number") {
-		return fmt.Errorf("value is not an X.509 certificate; paste the downloaded %s content (BEGIN CERTIFICATE), not 应用公钥/私钥: %w", filename, err)
+		return fmt.Errorf("value is not an X.509 certificate; paste the downloaded %s content (BEGIN CERTIFICATE), not 应用公钥/私钥. Or clear the three cert fields and use public-key mode with 支付宝公钥: %w", filename, err)
 	}
 	return err
 }

@@ -2,6 +2,7 @@ package setting
 
 var AlipayAppId = ""
 var AlipayPrivateKey = ""
+var AlipayPublicKey = ""
 var AlipayAppPublicCert = ""
 var AlipayRootCert = ""
 var AlipayPublicCert = ""

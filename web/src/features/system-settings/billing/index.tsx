@@ -80,6 +80,7 @@ const defaultBillingSettings: BillingSettings = {
   StripePromotionCodesEnabled: false,
   AlipayAppId: '',
   AlipayPrivateKey: '',
+  AlipayPublicKey: '',
   AlipayAppPublicCert: '',
   AlipayRootCert: '',
   AlipayPublicCert: '',

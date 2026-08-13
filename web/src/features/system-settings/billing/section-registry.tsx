@@ -150,6 +150,7 @@ const BILLING_SECTIONS = [
           StripePromotionCodesEnabled: settings.StripePromotionCodesEnabled,
           AlipayAppId: settings.AlipayAppId ?? '',
           AlipayPrivateKey: settings.AlipayPrivateKey ?? '',
+          AlipayPublicKey: settings.AlipayPublicKey ?? '',
           AlipayAppPublicCert: settings.AlipayAppPublicCert ?? '',
           AlipayRootCert: settings.AlipayRootCert ?? '',
           AlipayPublicCert: settings.AlipayPublicCert ?? '',

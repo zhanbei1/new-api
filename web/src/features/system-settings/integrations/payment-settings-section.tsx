@@ -150,6 +150,7 @@ const paymentSchema = z.object({
   StripePromotionCodesEnabled: z.boolean(),
   AlipayAppId: z.string(),
   AlipayPrivateKey: z.string(),
+  AlipayPublicKey: z.string(),
   AlipayAppPublicCert: z.string(),
   AlipayRootCert: z.string(),
   AlipayPublicCert: z.string(),
@@ -445,6 +446,7 @@ export function PaymentSettingsSection({
       StripePromotionCodesEnabled: values.StripePromotionCodesEnabled,
       AlipayAppId: values.AlipayAppId.trim(),
       AlipayPrivateKey: values.AlipayPrivateKey.trim(),
+      AlipayPublicKey: values.AlipayPublicKey.trim(),
       AlipayAppPublicCert: values.AlipayAppPublicCert.trim(),
       AlipayRootCert: values.AlipayRootCert.trim(),
       AlipayPublicCert: values.AlipayPublicCert.trim(),
@@ -499,6 +501,7 @@ export function PaymentSettingsSection({
         initialRef.current.StripePromotionCodesEnabled,
       AlipayAppId: initialRef.current.AlipayAppId.trim(),
       AlipayPrivateKey: initialRef.current.AlipayPrivateKey.trim(),
+      AlipayPublicKey: initialRef.current.AlipayPublicKey.trim(),
       AlipayAppPublicCert: initialRef.current.AlipayAppPublicCert.trim(),
       AlipayRootCert: initialRef.current.AlipayRootCert.trim(),
       AlipayPublicCert: initialRef.current.AlipayPublicCert.trim(),
@@ -634,6 +637,9 @@ export function PaymentSettingsSection({
     }
     if (sanitized.AlipayPrivateKey) {
       updates.push({ key: 'AlipayPrivateKey', value: sanitized.AlipayPrivateKey })
+    }
+    if (sanitized.AlipayPublicKey) {
+      updates.push({ key: 'AlipayPublicKey', value: sanitized.AlipayPublicKey })
     }
     if (sanitized.AlipayAppPublicCert !== initial.AlipayAppPublicCert) {
       updates.push({
@@ -1520,7 +1526,7 @@ export function PaymentSettingsSection({
                   <h3 className='text-lg font-medium'>{t('Alipay Gateway')}</h3>
                   <p className='text-muted-foreground text-sm'>
                     {t(
-                      'Native Alipay scan-to-pay (certificate mode). Paste PEM certificate contents below.'
+                      'Use public-key mode (App ID + application private key + Alipay public key) or certificate mode (three .crt files). Do not paste the application public key into certificate fields.'
                     )}
                   </p>
                 </div>
@@ -1608,6 +1614,33 @@ export function PaymentSettingsSection({
 
                 <FormField
                   control={form.control}
+                  name='AlipayPublicKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Alipay public key')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          rows={4}
+                          className='font-mono text-xs'
+                          placeholder={t(
+                            'Paste Alipay platform public key (not application public key)'
+                          )}
+                          autoComplete='off'
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Public-key mode: copy 支付宝公钥 from Open Platform after uploading 应用公钥. Leave blank to use certificate mode instead.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name='AlipayAppPublicCert'
                   render={({ field }) => (
                     <FormItem>
@@ -1620,6 +1653,11 @@ export function PaymentSettingsSection({
                           {...field}
                         />
                       </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Certificate mode only. Must start with BEGIN CERTIFICATE.'
+                        )}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

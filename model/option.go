@@ -97,6 +97,7 @@ func InitOptionMap() {
 	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
 	common.OptionMap["AlipayAppId"] = setting.AlipayAppId
 	common.OptionMap["AlipayPrivateKey"] = setting.AlipayPrivateKey
+	common.OptionMap["AlipayPublicKey"] = setting.AlipayPublicKey
 	common.OptionMap["AlipayAppPublicCert"] = setting.AlipayAppPublicCert
 	common.OptionMap["AlipayRootCert"] = setting.AlipayRootCert
 	common.OptionMap["AlipayPublicCert"] = setting.AlipayPublicCert
@@ -468,6 +469,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.AlipayAppId = value
 	case "AlipayPrivateKey":
 		setting.AlipayPrivateKey = value
+	case "AlipayPublicKey":
+		setting.AlipayPublicKey = value
 	case "AlipayAppPublicCert":
 		setting.AlipayAppPublicCert = value
 	case "AlipayRootCert":

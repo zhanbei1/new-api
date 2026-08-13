@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/smartwalle/alipay/v3"
 	"github.com/stretchr/testify/require"
 )
@@ -100,6 +101,55 @@ func TestAlipayLoadAppCertAcceptsLiteralNewlines(t *testing.T) {
 	})), false)
 	require.NoError(t, err)
 	require.NoError(t, client.LoadAppCertPublicKey(normalizeAlipayPEMMaterial(strings.ReplaceAll(string(certPEM), "\n", `\n`))))
+}
+
+func TestGetAlipayClientPrefersPublicKeyMode(t *testing.T) {
+	origAppID := setting.AlipayAppId
+	origPrivateKey := setting.AlipayPrivateKey
+	origPublicKey := setting.AlipayPublicKey
+	origAppCert := setting.AlipayAppPublicCert
+	origRootCert := setting.AlipayRootCert
+	origPublicCert := setting.AlipayPublicCert
+	origProduction := setting.AlipayIsProduction
+	origEncryptKey := setting.AlipayEncryptKey
+	t.Cleanup(func() {
+		setting.AlipayAppId = origAppID
+		setting.AlipayPrivateKey = origPrivateKey
+		setting.AlipayPublicKey = origPublicKey
+		setting.AlipayAppPublicCert = origAppCert
+		setting.AlipayRootCert = origRootCert
+		setting.AlipayPublicCert = origPublicCert
+		setting.AlipayIsProduction = origProduction
+		setting.AlipayEncryptKey = origEncryptKey
+		alipayClientMu.Lock()
+		alipayClient = nil
+		alipayClientFP = ""
+		alipayClientMu.Unlock()
+	})
+
+	appKey := mustAlipayTestKey(t)
+	alipayKey := mustAlipayTestKey(t)
+	pubDER, err := x509.MarshalPKIXPublicKey(&alipayKey.PublicKey)
+	require.NoError(t, err)
+	alipayPubPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}))
+
+	setting.AlipayAppId = "2021000000000000"
+	setting.AlipayPrivateKey = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(appKey),
+	}))
+	setting.AlipayPublicKey = alipayPubPEM
+	// Mis-pasted application public key in cert fields must not block public-key mode.
+	setting.AlipayAppPublicCert = mustAlipayTestPublicKeyPEM(t)
+	setting.AlipayRootCert = "not-a-cert"
+	setting.AlipayPublicCert = "not-a-cert"
+	setting.AlipayIsProduction = false
+	setting.AlipayEncryptKey = ""
+
+	require.True(t, IsAlipayConfigured())
+	client, err := GetAlipayClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
 }
 
 func mustAlipayTestKey(t *testing.T) *rsa.PrivateKey {
