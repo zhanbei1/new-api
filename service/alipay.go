@@ -63,18 +63,9 @@ func GetAlipayClient() (*alipay.Client, error) {
 	}
 
 	switch {
-	case alipayPublicKeyModeConfigured():
-		// Public-key mode and certificate mode are mutually exclusive in the SDK.
-		// Prefer explicit 支付宝公钥 when set so RSA-key users are not blocked by
-		// leftover mis-pasted "cert" fields that still contain 应用公钥 material.
-		publicKey, err := prepareAlipayPlatformPublicKey(setting.AlipayPublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("load Alipay public key: %w", err)
-		}
-		if err := client.LoadAliPayPublicKey(publicKey); err != nil {
-			return nil, fmt.Errorf("load Alipay public key: %w", wrapAlipayPublicKeyError(publicKey, err))
-		}
 	case alipayCertModeConfigured():
+		// Match Alipay Open Platform "证书" signing: prefer certs when all three are present,
+		// even if a leftover AlipayPublicKey value remains from an earlier misconfiguration.
 		appCert := normalizeAlipayPEMMaterial(setting.AlipayAppPublicCert)
 		if err := client.LoadAppCertPublicKey(appCert); err != nil {
 			return nil, fmt.Errorf("load Alipay app cert: %w", wrapAlipayCertError("appCertPublicKey_*.crt", appCert, err))
@@ -86,6 +77,14 @@ func GetAlipayClient() (*alipay.Client, error) {
 		alipayCert := normalizeAlipayPEMMaterial(setting.AlipayPublicCert)
 		if err := client.LoadAlipayCertPublicKey(alipayCert); err != nil {
 			return nil, fmt.Errorf("load Alipay public cert: %w", wrapAlipayCertError("alipayCertPublicKey_RSA2.crt", alipayCert, err))
+		}
+	case alipayPublicKeyModeConfigured():
+		publicKey, err := prepareAlipayPlatformPublicKey(setting.AlipayPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("load Alipay public key: %w", err)
+		}
+		if err := client.LoadAliPayPublicKey(publicKey); err != nil {
+			return nil, fmt.Errorf("load Alipay public key: %w", wrapAlipayPublicKeyError(publicKey, err))
 		}
 	default:
 		return nil, fmt.Errorf("Alipay credentials incomplete: configure either certificate mode (app/root/alipay certs) or public-key mode (支付宝公钥)")
@@ -114,6 +113,8 @@ func normalizeAlipayPEMNewlines(raw string) string {
 	if s == "" {
 		return s
 	}
+	s = strings.TrimPrefix(s, "\ufeff")
+	s = strings.Trim(s, "\"'`")
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
 	s = strings.ReplaceAll(s, "\\n", "\n")
@@ -121,13 +122,17 @@ func normalizeAlipayPEMNewlines(raw string) string {
 }
 
 func stripAlipayBase64Whitespace(s string) string {
+	// Form/HTML pastes often turn '+' into spaces; restore before dropping whitespace.
+	s = strings.ReplaceAll(s, " ", "+")
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if r == ' ' || r == '\n' || r == '\t' {
+		switch r {
+		case '\n', '\t', '\r':
 			continue
+		default:
+			b.WriteRune(r)
 		}
-		b.WriteRune(r)
 	}
 	return b.String()
 }
@@ -173,17 +178,66 @@ func decodeAlipayKeyDER(raw string) ([]byte, error) {
 	if m := len(s) % 4; m != 0 {
 		s += strings.Repeat("=", 4-m)
 	}
-	der, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base64 key material: %w", err)
+	if der, err := base64.StdEncoding.DecodeString(s); err == nil {
+		return der, nil
 	}
-	return der, nil
+	if der, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(s, "=")); err == nil {
+		return der, nil
+	}
+	if der, err := base64.URLEncoding.DecodeString(s); err == nil {
+		return der, nil
+	}
+	return nil, fmt.Errorf("invalid base64 key material")
+}
+
+func parseAlipayRSAPublicKey(der []byte) (*rsa.PublicKey, error) {
+	if pub, err := x509.ParsePKIXPublicKey(der); err == nil {
+		rsaPub, ok := pub.(*rsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("Alipay public key must be an RSA public key")
+		}
+		return rsaPub, nil
+	}
+	if pub, err := x509.ParsePKCS1PublicKey(der); err == nil {
+		return pub, nil
+	}
+	if cert, err := x509.ParseCertificate(der); err == nil {
+		rsaPub, ok := cert.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("certificate does not contain an RSA public key")
+		}
+		return rsaPub, nil
+	}
+	// Some pastes are base64(PEM text) or base64(base64(DER)).
+	if text := strings.TrimSpace(string(der)); strings.Contains(text, "BEGIN") || looksLikeAlipayBase64(text) {
+		if nested, err := decodeAlipayKeyDER(text); err == nil && len(nested) > 0 && string(nested) != string(der) {
+			return parseAlipayRSAPublicKey(nested)
+		}
+	}
+	return nil, fmt.Errorf("unrecognized RSA public key encoding (decoded %d bytes, paste length often ~390 for RSA2048 支付宝公钥)", len(der))
+}
+
+func looksLikeAlipayBase64(s string) bool {
+	if len(s) < 32 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		case c == '+' || c == '/' || c == '=' || c == '-' || c == '_' || c == '\n':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // prepareAlipayPlatformPublicKey accepts Alipay key-tool / console public keys in
 // raw PKCS#1 or PKIX base64 (with or without PEM headers) and returns PKIX PEM
 // that smartwalle/alipay LoadAliPayPublicKey can parse.
 func prepareAlipayPlatformPublicKey(raw string) (string, error) {
+	normalized := normalizeAlipayPEMMaterial(stripAlipayKeyLabel(raw))
 	der, err := decodeAlipayKeyDER(raw)
 	if err != nil {
 		return "", wrapAlipayPublicKeyError(raw, err)
@@ -194,17 +248,11 @@ func prepareAlipayPlatformPublicKey(raw string) (string, error) {
 	if _, err := x509.ParsePKCS8PrivateKey(der); err == nil {
 		return "", fmt.Errorf("value is a private key; paste 支付宝公钥 from Open Platform, not 应用私钥")
 	}
-	if pub, err := x509.ParsePKIXPublicKey(der); err == nil {
-		rsaPub, ok := pub.(*rsa.PublicKey)
-		if !ok {
-			return "", fmt.Errorf("Alipay public key must be an RSA public key")
-		}
-		return encodeAlipayPKIXPublicKey(rsaPub), nil
+	pub, err := parseAlipayRSAPublicKey(der)
+	if err != nil {
+		return "", wrapAlipayPublicKeyError(normalized, err)
 	}
-	if pub, err := x509.ParsePKCS1PublicKey(der); err == nil {
-		return encodeAlipayPKIXPublicKey(pub), nil
-	}
-	return "", wrapAlipayPublicKeyError(raw, fmt.Errorf("asn1: unrecognized RSA public key encoding"))
+	return encodeAlipayPKIXPublicKey(pub), nil
 }
 
 func encodeAlipayPKIXPublicKey(pub *rsa.PublicKey) string {
@@ -233,16 +281,7 @@ func wrapAlipayPublicKeyError(publicKey string, err error) error {
 	if err == nil {
 		return nil
 	}
-	upper := strings.ToUpper(publicKey)
-	if strings.Contains(upper, "BEGIN CERTIFICATE") ||
-		strings.Contains(upper, "BEGIN PRIVATE KEY") ||
-		strings.Contains(upper, "BEGIN RSA PRIVATE KEY") ||
-		strings.Contains(err.Error(), "asn1:") ||
-		strings.Contains(err.Error(), "invalid") ||
-		strings.Contains(err.Error(), "unrecognized") {
-		return fmt.Errorf("value is not a usable RSA public key string; paste 支付宝公钥 from Open Platform (接口加签方式), not 应用私钥 and not a .crt certificate. Raw base64 without BEGIN/END is OK: %w", err)
-	}
-	return err
+	return fmt.Errorf("value is not a usable RSA public key string (len=%d); paste 支付宝公钥 from Open Platform (接口加签方式 / 公钥模式). It is NOT the key-tool 应用公钥/应用私钥. Raw base64 without BEGIN/END is OK: %w", len(strings.TrimSpace(publicKey)), err)
 }
 
 func wrapAlipayCertError(filename, certPEM string, err error) error {

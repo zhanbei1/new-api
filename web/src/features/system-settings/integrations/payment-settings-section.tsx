@@ -257,6 +257,7 @@ export function PaymentSettingsSection({
   const [creemProductsVisualMode, setCreemProductsVisualMode] =
     React.useState(true)
   const [showComplianceDialog, setShowComplianceDialog] = React.useState(false)
+  const [clearAlipayPublicKey, setClearAlipayPublicKey] = React.useState(false)
   const [waffoPayMethods, setWaffoPayMethods] = React.useState<PayMethod[]>(
     () => parseWaffoPayMethods(waffoDefaultValues.WaffoPayMethods)
   )
@@ -638,7 +639,9 @@ export function PaymentSettingsSection({
     if (sanitized.AlipayPrivateKey) {
       updates.push({ key: 'AlipayPrivateKey', value: sanitized.AlipayPrivateKey })
     }
-    if (sanitized.AlipayPublicKey) {
+    if (clearAlipayPublicKey) {
+      updates.push({ key: 'AlipayPublicKey', value: '' })
+    } else if (sanitized.AlipayPublicKey) {
       updates.push({ key: 'AlipayPublicKey', value: sanitized.AlipayPublicKey })
     }
     if (sanitized.AlipayAppPublicCert !== initial.AlipayAppPublicCert) {
@@ -789,6 +792,11 @@ export function PaymentSettingsSection({
 
     for (const update of updates) {
       await updateOption.mutateAsync(update)
+    }
+
+    if (clearAlipayPublicKey) {
+      setClearAlipayPublicKey(false)
+      form.setValue('AlipayPublicKey', '')
     }
 
     if (!hasWaffoPancakeChanges) {
@@ -1626,6 +1634,7 @@ export function PaymentSettingsSection({
                             'Paste Alipay platform public key (not application public key)'
                           )}
                           autoComplete='off'
+                          disabled={clearAlipayPublicKey}
                           {...field}
                         />
                       </FormControl>
@@ -1638,6 +1647,23 @@ export function PaymentSettingsSection({
                     </FormItem>
                   )}
                 />
+
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>
+                      {t('Clear saved Alipay public key')}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'The field always looks empty for security. Enable this and save to delete a previously stored Alipay public key (needed when switching to certificate mode).'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <Switch
+                    checked={clearAlipayPublicKey}
+                    onCheckedChange={setClearAlipayPublicKey}
+                  />
+                </SettingsSwitchItem>
 
                 <FormField
                   control={form.control}

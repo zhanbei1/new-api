@@ -114,9 +114,15 @@ func TestPrepareAlipayPlatformPublicKeyAcceptsPKCS1AndPKIX(t *testing.T) {
 	pkixRaw := base64.StdEncoding.EncodeToString(pkixDER)
 	pkcs1Raw := base64.StdEncoding.EncodeToString(pkcs1DER)
 
-	for _, raw := range []string{pkixRaw, pkcs1Raw, "支付宝公钥：" + pkcs1Raw} {
+	for _, raw := range []string{
+		pkixRaw,
+		pkcs1Raw,
+		"支付宝公钥：" + pkcs1Raw,
+		strings.ReplaceAll(pkixRaw, "+", " "), // '+' lost to spaces
+		base64.StdEncoding.EncodeToString([]byte(pkixRaw)), // double-encoded
+	} {
 		prepared, err := prepareAlipayPlatformPublicKey(raw)
-		require.NoError(t, err, raw[:16])
+		require.NoError(t, err, "input kind failed")
 		client, err := alipay.New("2021000000000000", string(pem.EncodeToMemory(&pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: x509.MarshalPKCS1PrivateKey(key),
@@ -171,10 +177,61 @@ func TestGetAlipayClientPrefersPublicKeyMode(t *testing.T) {
 		Bytes: x509.MarshalPKCS1PrivateKey(appKey),
 	}))
 	setting.AlipayPublicKey = alipayPubPEM
-	// Mis-pasted application public key in cert fields must not block public-key mode.
-	setting.AlipayAppPublicCert = mustAlipayTestPublicKeyPEM(t)
-	setting.AlipayRootCert = "not-a-cert"
-	setting.AlipayPublicCert = "not-a-cert"
+	setting.AlipayAppPublicCert = ""
+	setting.AlipayRootCert = ""
+	setting.AlipayPublicCert = ""
+	setting.AlipayIsProduction = false
+	setting.AlipayEncryptKey = ""
+
+	require.True(t, IsAlipayConfigured())
+	client, err := GetAlipayClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
+
+func TestGetAlipayClientPrefersCertificateModeWhenBothConfigured(t *testing.T) {
+	origAppID := setting.AlipayAppId
+	origPrivateKey := setting.AlipayPrivateKey
+	origPublicKey := setting.AlipayPublicKey
+	origAppCert := setting.AlipayAppPublicCert
+	origRootCert := setting.AlipayRootCert
+	origPublicCert := setting.AlipayPublicCert
+	origProduction := setting.AlipayIsProduction
+	origEncryptKey := setting.AlipayEncryptKey
+	t.Cleanup(func() {
+		setting.AlipayAppId = origAppID
+		setting.AlipayPrivateKey = origPrivateKey
+		setting.AlipayPublicKey = origPublicKey
+		setting.AlipayAppPublicCert = origAppCert
+		setting.AlipayRootCert = origRootCert
+		setting.AlipayPublicCert = origPublicCert
+		setting.AlipayIsProduction = origProduction
+		setting.AlipayEncryptKey = origEncryptKey
+		alipayClientMu.Lock()
+		alipayClient = nil
+		alipayClientFP = ""
+		alipayClientMu.Unlock()
+	})
+
+	appKey := mustAlipayTestKey(t)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &appKey.PublicKey, appKey)
+	require.NoError(t, err)
+	certPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+
+	setting.AlipayAppId = "2021000000000000"
+	setting.AlipayPrivateKey = string(pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(appKey),
+	}))
+	setting.AlipayPublicKey = "not-a-valid-public-key"
+	setting.AlipayAppPublicCert = certPEM
+	setting.AlipayRootCert = certPEM
+	setting.AlipayPublicCert = certPEM
 	setting.AlipayIsProduction = false
 	setting.AlipayEncryptKey = ""
 
