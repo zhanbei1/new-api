@@ -84,11 +84,25 @@ func SubscriptionRequestAlipayPay(c *gin.Context) {
 
 	rsp, err := client.TradePreCreate(c.Request.Context(), p)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Alipay subscription TradePreCreate failed user_id=%d plan_id=%d error=%q", userId, plan.Id, err.Error()))
+		logger.LogError(c.Request.Context(), fmt.Sprintf(
+			"Alipay subscription TradePreCreate failed user_id=%d plan_id=%d trade_no=%s notify_url=%s error=%q",
+			userId, plan.Id, tradeNo, notifyURL, err.Error(),
+		))
 		common.ApiErrorMsg(c, "拉起支付失败")
 		return
 	}
-	if rsp == nil || strings.TrimSpace(rsp.QRCode) == "" {
+	// smartwalle/alipay returns err=nil on HTTP OK even when Alipay business fails;
+	// empty qr_code + SubCode/SubMsg is the usual failure shape (previously silent — no log).
+	if rsp == nil || rsp.IsFailure() || strings.TrimSpace(rsp.QRCode) == "" {
+		code, msg, subCode, subMsg := "", "", "", ""
+		if rsp != nil {
+			code, msg, subCode, subMsg = string(rsp.Code), rsp.Msg, rsp.SubCode, rsp.SubMsg
+		}
+		logger.LogError(c.Request.Context(), fmt.Sprintf(
+			"Alipay subscription TradePreCreate rejected user_id=%d plan_id=%d trade_no=%s notify_url=%s code=%s msg=%q sub_code=%s sub_msg=%q qr_empty=%v",
+			userId, plan.Id, tradeNo, notifyURL, code, msg, subCode, subMsg,
+			rsp == nil || strings.TrimSpace(rsp.QRCode) == "",
+		))
 		common.ApiErrorMsg(c, "拉起支付失败")
 		return
 	}
