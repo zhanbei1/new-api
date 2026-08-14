@@ -83,12 +83,24 @@ func RequestAlipayPay(c *gin.Context) {
 
 	rsp, err := client.TradePreCreate(c.Request.Context(), p)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Alipay TradePreCreate failed user_id=%d trade_no=%s error=%q", id, tradeNo, err.Error()))
+		logger.LogError(c.Request.Context(), fmt.Sprintf(
+			"Alipay TradePreCreate failed user_id=%d trade_no=%s notify_url=%s error=%q",
+			id, tradeNo, notifyURL, err.Error(),
+		))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
 		return
 	}
-	if rsp == nil || strings.TrimSpace(rsp.QRCode) == "" {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("Alipay TradePreCreate empty qr_code user_id=%d trade_no=%s", id, tradeNo))
+	// smartwalle/alipay returns err=nil on HTTP OK even when Alipay business fails.
+	if rsp == nil || rsp.IsFailure() || strings.TrimSpace(rsp.QRCode) == "" {
+		code, msg, subCode, subMsg := "", "", "", ""
+		if rsp != nil {
+			code, msg, subCode, subMsg = string(rsp.Code), rsp.Msg, rsp.SubCode, rsp.SubMsg
+		}
+		logger.LogError(c.Request.Context(), fmt.Sprintf(
+			"Alipay TradePreCreate rejected user_id=%d trade_no=%s notify_url=%s code=%s msg=%q sub_code=%s sub_msg=%q qr_empty=%v",
+			id, tradeNo, notifyURL, code, msg, subCode, subMsg,
+			rsp == nil || strings.TrimSpace(rsp.QRCode) == "",
+		))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
 		return
 	}
