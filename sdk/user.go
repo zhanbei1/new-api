@@ -35,11 +35,14 @@ func (c *Client) GetUserModels(ctx context.Context, group string) ([]string, err
 }
 
 // UpdateSelfRequest updates profile fields.
+// PhoneVerificationCode may be supplied instead of OriginalPassword to prove
+// ownership of the bound phone when changing the password (e.g. reset flows).
 type UpdateSelfRequest struct {
-	Username         string `json:"username,omitempty"`
-	DisplayName      string `json:"display_name,omitempty"`
-	Password         string `json:"password,omitempty"`
-	OriginalPassword string `json:"original_password,omitempty"`
+	Username              string `json:"username,omitempty"`
+	DisplayName           string `json:"display_name,omitempty"`
+	Password              string `json:"password,omitempty"`
+	OriginalPassword      string `json:"original_password,omitempty"`
+	PhoneVerificationCode string `json:"phone_verification_code,omitempty"`
 }
 
 // UpdateSelf updates the current user profile.

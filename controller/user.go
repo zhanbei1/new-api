@@ -934,7 +934,23 @@ func UpdateSelf(c *gin.Context) {
 			}
 		}
 	}
-	updatePassword, err := checkUpdatePassword(user.OriginalPassword, user.Password, cleanUser.Id)
+	phoneCode, _ := requestData["phone_verification_code"].(string)
+	phoneCode = strings.TrimSpace(phoneCode)
+	if phoneCode == "" {
+		phoneCode = user.PhoneVerificationCode
+	}
+	phoneVerified := false
+	if strings.TrimSpace(user.OriginalPassword) == "" && phoneCode != "" {
+		originUser, oerr := model.GetUserById(cleanUser.Id, false)
+		if oerr != nil || originUser == nil || strings.TrimSpace(originUser.Phone) == "" ||
+			!common.VerifyCodeWithKey(originUser.Phone, phoneCode, common.PhoneLoginPurpose) {
+			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+			return
+		}
+		common.DeleteKey(originUser.Phone, common.PhoneLoginPurpose)
+		phoneVerified = true
+	}
+	updatePassword, err := checkUpdatePassword(user.OriginalPassword, user.Password, cleanUser.Id, phoneVerified)
 	if err != nil {
 		if errors.Is(err, errUserPasswordUnset) {
 			common.ApiErrorI18n(c, i18n.MsgUserPasswordUnset)
@@ -949,7 +965,7 @@ func UpdateSelf(c *gin.Context) {
 	}
 	if updatePassword {
 		identity, ok := middleware.GetSessionAuthIdentity(c)
-		if !ok {
+		if !ok && !phoneVerified {
 			common.ApiError(c, errors.New("当前认证方式不支持安全验证"))
 			return
 		}
@@ -961,6 +977,12 @@ func UpdateSelf(c *gin.Context) {
 		}
 		if err := model.PublishUserAuthCache(cleanUser.Id); err != nil {
 			common.ApiError(c, err)
+			return
+		}
+		if !ok {
+			// 通过短信验证码完成验证的请求（通常以 PAT 认证）没有可轮换的
+			// 浏览器会话：此处仅完成密码更新，不返回新的会话数据。
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 			return
 		}
 		bundle, err := service.AdvanceCurrentSessionToUserVersion(identity, "password_changed")
@@ -989,7 +1011,7 @@ func UpdateSelf(c *gin.Context) {
 	return
 }
 
-func checkUpdatePassword(originalPassword string, newPassword string, userId int) (updatePassword bool, err error) {
+func checkUpdatePassword(originalPassword string, newPassword string, userId int, phoneVerified ...bool) (updatePassword bool, err error) {
 	if newPassword == "" {
 		return
 	}
@@ -1002,6 +1024,11 @@ func checkUpdatePassword(originalPassword string, newPassword string, userId int
 	// 密码不为空,需要验证原密码
 	if currentUser.Password == "" {
 		err = errUserPasswordUnset
+		return
+	}
+	if len(phoneVerified) > 0 && phoneVerified[0] {
+		// 已通过绑定手机号短信验证码完成验证，无需校验原密码。
+		updatePassword = true
 		return
 	}
 	if !common.ValidatePasswordAndHash(originalPassword, currentUser.Password) {
