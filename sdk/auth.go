@@ -101,6 +101,27 @@ func (c *Client) Login(ctx context.Context, username, password string) (*LoginRe
 	return &result, nil
 }
 
+// ResetPasswordByPhone resets a user's password via a login SMS code sent to
+// their bound phone. The code is verified and consumed by the server in one
+// step; do NOT call LoginSMS first (that would consume the code).
+func (c *Client) ResetPasswordByPhone(ctx context.Context, phone, code, newPassword string) error {
+	return c.doPublic(ctx, "POST", "/api/user/password/reset", nil, map[string]string{
+		"phone":    phone,
+		"code":     code,
+		"password": newPassword,
+	}, nil)
+}
+
+// PeekSMSLoginCode verifies a login SMS code WITHOUT consuming it, so the same
+// code can still be used by a subsequent UpdateSelf (phone_verification_code)
+// or ResetPasswordByPhone call. Use this for two-step verify-then-mutate flows.
+func (c *Client) PeekSMSLoginCode(ctx context.Context, phone, code string) error {
+	return c.doPublic(ctx, "POST", "/api/user/sms/peek", nil, map[string]string{
+		"phone":             phone,
+		"verification_code": code,
+	}, nil)
+}
+
 // LoginSMS authenticates with phone + SMS verification code and stores the access token.
 // Obtain the code via SendSMSLoginCode first.
 func (c *Client) LoginSMS(ctx context.Context, phone, code string) (*LoginResult, error) {

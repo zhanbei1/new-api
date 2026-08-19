@@ -108,6 +108,14 @@ func VerifyCodeWithKey(key string, code string, purpose string) bool {
 	return code == value.code
 }
 
+// PeekCodeWithKey verifies a code without consuming it. Unlike the verify +
+// DeleteKey pattern, this leaves the code valid so a later step (e.g. an
+// authenticated UpdateSelf) can consume it. Use for two-step flows such as
+// "verify now, mutate later" where the same code must survive the first check.
+func PeekCodeWithKey(key string, code string, purpose string) bool {
+	return VerifyCodeWithKey(key, code, purpose)
+}
+
 func DeleteKey(key string, purpose string) {
 	if RedisEnabled {
 		_ = RedisDel(verificationRedisKey(purpose, key))

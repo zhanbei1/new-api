@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/sms"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type SMSTestRequest struct {
@@ -225,4 +226,88 @@ func LoginSMS(c *gin.Context) {
 
 	common.DeleteKey(phone, common.PhoneLoginPurpose)
 	setupLogin(user, c)
+}
+
+type ResetPasswordByPhoneRequest struct {
+	Phone    string `json:"phone"`
+	Code     string `json:"code"`
+	Password string `json:"password"`
+}
+
+// PeekSMSLoginCode verifies a login SMS code against a phone WITHOUT consuming
+// it. Used by the two-step "verify then change password" flow where the same
+// code must remain valid for the subsequent authenticated UpdateSelf call.
+func PeekSMSLoginCode(c *gin.Context) {
+	if !common.PhoneVerificationEnabled {
+		common.ApiErrorMsg(c, "手机号验证未启用")
+		return
+	}
+	var req SMSLoginRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	phone := model.NormalizePhone(req.Phone)
+	code := strings.TrimSpace(req.VerificationCode)
+	if !model.IsValidPhone(phone) || code == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if !common.PeekCodeWithKey(phone, code, common.PhoneLoginPurpose) {
+		common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+}
+
+// ResetPasswordByPhone resets a user's password using a login SMS code sent to
+// their bound phone. The code is verified and consumed atomically here, so the
+// caller must not perform an SMS login first (that would consume the code).
+func ResetPasswordByPhone(c *gin.Context) {
+	if !common.PhoneVerificationEnabled {
+		common.ApiErrorMsg(c, "手机号验证未启用")
+		return
+	}
+	var req ResetPasswordByPhoneRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	phone := model.NormalizePhone(req.Phone)
+	code := strings.TrimSpace(req.Code)
+	password := strings.TrimSpace(req.Password)
+	if !model.IsValidPhone(phone) || code == "" || password == "" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if n := len([]rune(password)); n < 8 || n > 20 {
+		common.ApiErrorMsg(c, "密码长度需为 8-20 位")
+		return
+	}
+	user, err := model.GetUserByPhone(phone)
+	if err != nil || user == nil || user.Status != common.UserStatusEnabled {
+		common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
+		return
+	}
+	if !common.VerifyCodeWithKey(phone, code, common.PhoneLoginPurpose) {
+		common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+		return
+	}
+	common.DeleteKey(phone, common.PhoneLoginPurpose)
+	target := model.User{Id: user.Id, Password: password}
+	if err := model.DB.Transaction(func(tx *gorm.DB) error {
+		return target.UpdateWithTx(tx, true)
+	}); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.PublishUserAuthCache(user.Id); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	// 使所有既有会话/PAT 失效，强制使用新密码重新登录。
+	if _, err := model.RevokeAllUserSessions(user.Id, "password_reset"); err != nil {
+		common.SysLog(fmt.Sprintf("password reset: revoke sessions for user %d failed: %v", user.Id, err))
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 }
